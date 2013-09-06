@@ -13,11 +13,7 @@ case class DatabaseInfo(dbName:String, docCount:Long, docDelCount:Long,
                     diskSize:Long, dataSize:Long, instanceStartTime:String,
                     diskFormatVersion:Long, committedUpdateSeq:Long)
 
-case class DatabaseCreateResult(ok:Boolean)
-
 object Database {
-  implicit val databaseCreateResultFmt = Json.format[DatabaseCreateResult]
-
   implicit val databaseInfoReads = (
       (__ \ "db_name").read[String] ~
       (__ \ "doc_count").read[Long] ~
@@ -43,7 +39,7 @@ object Database {
   def create()(implicit database:Database): Future[Boolean] = {
     val request = url(database.url).PUT
     val response = Http(request OK as.String)
-    val result = for (createResult <- response) yield Json.fromJson[DatabaseCreateResult](Json.parse(createResult)).get.ok
+    val result = for (createResult <- response) yield (Json.parse(createResult) \ "ok").as[Boolean]
     result
   }
 }

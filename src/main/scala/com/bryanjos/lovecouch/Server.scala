@@ -7,17 +7,12 @@ import dispatch.{url, Http, as}
 
 case class Server(host:String = "127.0.0.1", port:Int = 5984) { def url:String = s"http://$host:$port" }
 case class ServerInfo(couchdb:String, version:String, uuid:String, vendor:Vendor)
-
 case class Vendor(version:String, name:String)
-
-
-case class UUIDs(uuids: List[String])
 
 object Server {
       implicit val serverFmt = Json.format[Server]
       implicit val vendorFmt = Json.format[Vendor]
       implicit val serverInfofmt = Json.format[ServerInfo]
-      implicit val uuidsFmt = Json.format[UUIDs]
 
      def info(server:Server=Server()): Future[ServerInfo] = {
        val request = url(server.url).GET
@@ -26,10 +21,10 @@ object Server {
        result
      }
 
-    def uuids(server:Server=Server(), count:Int=1): Future[UUIDs] = {
+    def uuids(server:Server=Server(), count:Int=1): Future[List[String]] = {
       val request = url(server.url + s"/_uuids?count=$count").GET
       val response = Http(request OK as.String)
-      val result = for (uuids <- response) yield Json.fromJson[UUIDs](Json.parse(uuids)).get
+      val result = for (uuids <- response) yield (Json.parse(uuids) \ "uuids").as[List[String]]
       result
     }
 }
