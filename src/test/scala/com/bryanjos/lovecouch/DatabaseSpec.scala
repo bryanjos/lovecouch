@@ -9,7 +9,9 @@ class DatabaseSpec extends FunSpec {
 
   describe("Get Database by name") {
     it("dbName should be '_users'"){
-      val futureDatabase = Database.info(Database("_users"))
+      implicit val db = Database("_users")
+
+      val futureDatabase = Database.info()
 
       futureDatabase onFailure {
         case t => fail("An error has occured: " + t.getMessage)

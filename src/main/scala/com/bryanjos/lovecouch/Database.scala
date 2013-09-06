@@ -7,7 +7,7 @@ import play.api.libs.functional.syntax._
 import dispatch.{url, Http, as}
 
 
-case class Database(name:String, server:Server=Server())
+case class Database(name:String, server:Server=Server()) { def url:String = server.url + s"/$name" }
 case class DatabaseInfo(dbName:String, docCount:Long, docDelCount:Long,
                     updateSeq:Long, purgeSeq:Long, compactRunning:Boolean,
                     diskSize:Long, dataSize:Long, instanceStartTime:String,
@@ -33,15 +33,15 @@ object Database {
     )(DatabaseInfo.apply _)
 
 
-  def info(database:Database): Future[DatabaseInfo] = {
-    val request = url(s"http://${database.server.host}:${database.server.port}/${database.name}").GET
+  def info()(implicit database:Database): Future[DatabaseInfo] = {
+    val request = url(database.url).GET
     val response = Http(request OK as.String)
     val result = for (database <- response) yield Json.fromJson[DatabaseInfo](Json.parse(database)).get
     result
   }
 
-  def create(database:Database): Future[Boolean] = {
-    val request = url(s"http://${database.server.host}:${database.server.port}/${database.name}").PUT
+  def create()(implicit database:Database): Future[Boolean] = {
+    val request = url(database.url).PUT
     val response = Http(request OK as.String)
     val result = for (createResult <- response) yield Json.fromJson[DatabaseCreateResult](Json.parse(createResult)).get.ok
     result
