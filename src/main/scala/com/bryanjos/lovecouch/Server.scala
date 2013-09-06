@@ -10,7 +10,6 @@ case class ServerInfo(couchdb:String, version:String, uuid:String, vendor:Vendor
 case class Vendor(version:String, name:String)
 
 object Server {
-      implicit val serverFmt = Json.format[Server]
       implicit val vendorFmt = Json.format[Vendor]
       implicit val serverInfofmt = Json.format[ServerInfo]
 
