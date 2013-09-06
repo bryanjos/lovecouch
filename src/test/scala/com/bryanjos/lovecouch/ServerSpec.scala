@@ -5,28 +5,42 @@ import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 
 class ServerSpec extends FunSpec {
-  describe("Get Server with default host and port") {
+  describe("Server info with default host and port") {
     it("couchdb should equal 'Welcome'"){
 
-      val f = Server.get()
+      val futureServerInfo = Server.info()
 
-      f onFailure {
+      futureServerInfo onFailure {
         case t => fail("An error has occured: " + t.getMessage)
       }
-      f onSuccess {
-        case server => assert(server.couchdb == "Welcome")
+      futureServerInfo onSuccess {
+        case serverInfo => assert(serverInfo.couchdb == "Welcome")
       }
     }
 
     it("vender.name should equal 'The Apache Software Foundation'"){
 
-      val f = Server.get()
+      val futureServer = Server.info()
 
-      f onFailure {
+      futureServer onFailure {
         case t => fail("An error has occured: " + t.getMessage)
       }
-      f onSuccess {
-        case server => assert(server.vendor.name == "The Apache Software Foundation")
+      futureServer onSuccess {
+        case serverInfo => assert(serverInfo.vendor.name == "The Apache Software Foundation")
+      }
+    }
+  }
+
+
+  describe("Get Database by name") {
+    it("dbName should be '_users'"){
+      val futureDatabase = Server.getDatabase("_users")
+
+      futureDatabase onFailure {
+        case t => fail("An error has occured: " + t.getMessage)
+      }
+      futureDatabase onSuccess {
+        case database => assert(database.dbName == "_users")
       }
     }
   }
