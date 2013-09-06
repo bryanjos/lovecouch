@@ -7,7 +7,7 @@ import play.api.libs.functional.syntax._
 import dispatch.{url, Http, as}
 
 
-case class Database(name:String, server:Server=Server()) { def url:String = server.url + s"/$name" }
+case class Database(name:String, couchDb:CouchDb=CouchDb()) { def url:String = couchDb.url + s"/$name" }
 case class DatabaseInfo(dbName:String, docCount:Long, docDelCount:Long,
                     updateSeq:Long, purgeSeq:Long, compactRunning:Boolean,
                     diskSize:Long, dataSize:Long, instanceStartTime:String,
