@@ -1,6 +1,7 @@
 package com.bryanjos.lovecouch
 
 import scala.concurrent._
+import scala.concurrent.duration._
 import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 
@@ -16,18 +17,22 @@ class ServerSpec extends FunSpec {
       futureServerInfo onSuccess {
         case serverInfo => assert(serverInfo.couchdb == "Welcome")
       }
+
+      Await.ready(futureServerInfo, 5 seconds)
     }
 
     it("vender.name should equal 'The Apache Software Foundation'"){
 
-      val futureServer = Server.info()
+      val futureServerInfo = Server.info()
 
-      futureServer onFailure {
+      futureServerInfo onFailure {
         case t => fail("An error has occured: " + t.getMessage)
       }
-      futureServer onSuccess {
+      futureServerInfo onSuccess {
         case serverInfo => assert(serverInfo.vendor.name == "The Apache Software Foundation")
       }
+
+      Await.ready(futureServerInfo, 5 seconds)
     }
   }
 }

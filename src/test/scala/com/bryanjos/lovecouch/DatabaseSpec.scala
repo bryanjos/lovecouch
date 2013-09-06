@@ -1,6 +1,7 @@
 package com.bryanjos.lovecouch
 
 import scala.concurrent._
+import scala.concurrent.duration._
 import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 
@@ -16,6 +17,8 @@ class DatabaseSpec extends FunSpec {
       futureDatabase onSuccess {
         case database => assert(database.dbName == "_users")
       }
+
+      Await.ready(futureDatabase, 5 seconds)
     }
   }
 

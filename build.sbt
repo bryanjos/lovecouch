@@ -6,12 +6,15 @@ version := "0.1.0-SNAPSHOT"
 
 scalaVersion := "2.10.2"
 
-resolvers += "spray" at "http://repo.spray.io/"
+resolvers ++= Seq(
+"spray" at "http://repo.spray.io/",
+"Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases/"
+)
 
 libraryDependencies ++= Seq(
 	"org.scalatest" % "scalatest_2.10" % "2.0.RC1-SNAP4",
 	"net.databinder.dispatch" %% "dispatch-core" % "0.11.0",
-	"com.cloudphysics" % "jerkson_2.10" % "0.6.3"
+	"com.typesafe.play" % "play-json_2.10" % "2.2.0-M1"
 )
 
 
