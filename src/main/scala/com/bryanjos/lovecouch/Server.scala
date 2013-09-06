@@ -3,7 +3,6 @@ package com.bryanjos.lovecouch
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
-import play.api.libs.functional._
 import dispatch.{url, Http, as}
 
 case class Server(host:String = "127.0.0.1", port:Int = 5984)

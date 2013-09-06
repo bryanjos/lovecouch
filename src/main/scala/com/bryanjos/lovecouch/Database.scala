@@ -4,7 +4,6 @@ import com.codahale.jerkson.JsonSnakeCase
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
-import play.api.libs.functional._
 import play.api.libs.functional.syntax._
 import dispatch.{url, Http, as}
 
