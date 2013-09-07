@@ -61,10 +61,10 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[List[ActiveTask]] = {
+  def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[Vector[ActiveTask]] = {
     val request = url(couchDb.url + "/_active_tasks").GET
     val response = Http(request OK as.String)
-    val result = for (activeTasks <- response) yield Json.fromJson[List[ActiveTask]](Json.parse(activeTasks)).get
+    val result = for (activeTasks <- response) yield Json.fromJson[Vector[ActiveTask]](Json.parse(activeTasks)).get
     result
   }
 
@@ -73,10 +73,10 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[List[String]] = {
+  def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
     val request = url(couchDb.url + "/_all_dbs").GET
     val response = Http(request OK as.String)
-    val result = for (allDbs <- response) yield Json.parse(allDbs).as[List[String]]
+    val result = for (allDbs <- response) yield Json.parse(allDbs).as[Vector[String]]
     result
   }
 
@@ -161,10 +161,10 @@ object CouchDb {
    * @param count
    * @return
    */
-  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[List[String]] = {
+  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
     val request = url(couchDb.url + s"/_uuids?count=$count").GET
     val response = Http(request OK as.String)
-    val result = for (uuids <- response) yield (Json.parse(uuids) \ "uuids").as[List[String]]
+    val result = for (uuids <- response) yield (Json.parse(uuids) \ "uuids").as[Vector[String]]
     result
   }
 }

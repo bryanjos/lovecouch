@@ -6,7 +6,7 @@ import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 
 class CouchDbSpec extends FunSpec {
-  describe("Info with default host and port") {
+  describe("Info") {
     it("couchdb should equal 'Welcome'"){
 
       val couchDBInfoFuture = CouchDb.info()
@@ -49,6 +49,34 @@ class CouchDbSpec extends FunSpec {
 
       val result = future map { value =>
         assert(value.contains("_users"))
+      }
+
+      Await.result(result, 5 seconds)
+    }
+  }
+
+
+  describe("Log") {
+    it("should contain 'GET /_log'"){
+
+      val future = CouchDb.log()
+
+      val result = future map { value =>
+        assert(value.contains("GET /_log"))
+      }
+
+      Await.result(result, 5 seconds)
+    }
+  }
+
+
+  describe("Stats") {
+    it("should not fail"){
+
+      val future = CouchDb.stats()
+
+      val result = future map { value =>
+        println(value)
       }
 
       Await.result(result, 5 seconds)
