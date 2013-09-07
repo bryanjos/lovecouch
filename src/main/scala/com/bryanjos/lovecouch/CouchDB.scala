@@ -3,23 +3,43 @@ package com.bryanjos.lovecouch
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
+import play.api.libs.functional.syntax._
 import dispatch.{url, Http, as}
+import dispatch.stream.StringsByLine
 
 case class CouchDb(host: String = "127.0.0.1", port: Int = 5984) {
   def url: String = s"http://$host:$port"
 }
 
 case class CouchDbInfo(couchdb: String, version: String, uuid: String, vendor: Vendor)
+
 case class Vendor(version: String, name: String)
+
 case class ActiveTask(pid: String, status: String, task: String, taskType: String)
-case class DatabaseEvent(dbName:String, eventType:String)
+
+object DatabaseEvents extends Enumeration {
+  type DatabaseEvents = Value
+  val Created = Value("created")
+  val Updated = Value("updated")
+  val Deleted = Value("deleted")
+}
+
+case class DatabaseEvent(dbName: String, event: DatabaseEvents.DatabaseEvents)
+
+object FeedTypes extends Enumeration {
+  type FeedTypes = Value
+  val LongPoll = Value("longpoll")
+  val Continuous = Value("continuous")
+  val EventSource = Value("eventsource")
+  val Normal = Value("normal")
+}
 
 object CouchDb {
   implicit val vendorFmt = Json.format[Vendor]
   implicit val couchDbInfoFmt = Json.format[CouchDbInfo]
 
   implicit val activeTaskReads = (
-      (__ \ "pid").read[String] ~
+    (__ \ "pid").read[String] ~
       (__ \ "status").read[String] ~
       (__ \ "task").read[String] ~
       (__ \ "type").read[String]
@@ -27,8 +47,8 @@ object CouchDb {
 
 
   implicit val databaseEventReads = (
-      (__ \ "dbname").read[String] ~
-      (__ \ "type").read[String]
+    (__ \ "dbname").read[String] ~
+      (__ \ "type").read[DatabaseEvents.DatabaseEvents]
     )(DatabaseEvent.apply _)
 
   /**
@@ -69,18 +89,21 @@ object CouchDb {
 
   /**
    * Returns a list of all database events in the CouchDB instance.
-   * TODO:Make into a continuous stream.
    * @param feed
    * @param timeout
    * @param heartbeat
    * @param couchDb
    * @return
    */
-  def dbUpdates(feed: String = "longpoll", timeout: Long = 60, heartbeat:Boolean = true)(implicit couchDb: CouchDb = CouchDb()): Future[DatabaseEvent] = {
-    val request = url(couchDb.url + s"/_db_updates?feed=$feed&timeout=$timeout&heartbeat=$heartbeat").GET
-    val response = Http(request OK as.String)
-    val result = for (events <- response) yield Json.fromJson[DatabaseEvent](Json.parse(events)).get
-    result
+  def dbUpdates(feed: FeedTypes.FeedTypes = FeedTypes.LongPoll,
+                timeout: Long = 60,
+                heartbeat: Boolean = true,
+                callBack: DatabaseEvent => Unit)
+               (implicit couchDb: CouchDb = CouchDb()): Object with StringsByLine[Unit] = {
+    val request = url(couchDb.url + s"/_db_updates?feed=${feed.toString}&timeout=$timeout&heartbeat=$heartbeat").GET
+    val callBacker = as.stream.Lines(line => callBack(Json.fromJson[DatabaseEvent](Json.parse(line)).get))
+    Http(request > callBacker)
+    callBacker
   }
 
   /**
@@ -106,8 +129,10 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def replicate(bytes: Long = 1000, offset: Long = 0, replicationSpecification:JsValue)(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
-    val request = url(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset").POST << Json.stringify(replicationSpecification)
+  def replicate(bytes: Long = 1000, offset: Long = 0, replicationSpecification: JsValue)
+               (implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
+    val request = url(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset").POST <<
+      Json.stringify(replicationSpecification)
     val response = Http(request OK as.String)
     val result = for (res <- response) yield Json.parse(res)
     result

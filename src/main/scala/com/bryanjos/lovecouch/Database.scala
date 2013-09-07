@@ -42,4 +42,11 @@ object Database {
     val result = for (createResult <- response) yield (Json.parse(createResult) \ "ok").as[Boolean]
     result
   }
+
+  def delete()(implicit database:Database): Future[Boolean] = {
+    val request = url(database.url).DELETE
+    val response = Http(request OK as.String)
+    val result = for (createResult <- response) yield (Json.parse(createResult) \ "ok").as[Boolean]
+    result
+  }
 }
