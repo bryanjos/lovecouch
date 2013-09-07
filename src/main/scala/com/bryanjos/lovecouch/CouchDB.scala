@@ -95,7 +95,7 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def dbUpdates(feed: FeedTypes.FeedTypes = FeedTypes.LongPoll,
+  def updates(feed: FeedTypes.FeedTypes = FeedTypes.LongPoll,
                 timeout: Long = 60,
                 heartbeat: Boolean = true,
                 callBack: DatabaseEvent => Unit)
