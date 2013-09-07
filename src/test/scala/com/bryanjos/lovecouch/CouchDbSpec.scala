@@ -6,33 +6,52 @@ import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 
 class CouchDbSpec extends FunSpec {
-  describe("Server info with default host and port") {
+  describe("Info with default host and port") {
     it("couchdb should equal 'Welcome'"){
 
       val couchDBInfoFuture = CouchDb.info()
 
-      couchDBInfoFuture onFailure {
-        case t => fail("An error has occured: " + t.getMessage)
-      }
-      couchDBInfoFuture onSuccess {
-        case couchDBInfo => assert(couchDBInfo.couchdb == "Welcome")
+      val result = couchDBInfoFuture map { couchDBInfo =>
+        assert(couchDBInfo.couchdb == "Welcome")
       }
 
-      Await.ready(couchDBInfoFuture, 5 seconds)
+      Await.result(result, 5 seconds)
     }
 
     it("vender.name should equal 'The Apache Software Foundation'"){
 
       val couchDBInfoFuture = CouchDb.info()
-
-      couchDBInfoFuture onFailure {
-        case t => fail("An error has occured: " + t.getMessage)
-      }
-      couchDBInfoFuture onSuccess {
-        case  couchDBInfo => assert( couchDBInfo.vendor.name == "The Apache Software Foundation")
+      val result = couchDBInfoFuture map { couchDBInfo =>
+        assert( couchDBInfo.vendor.name == "The Apache Software Foundation")
       }
 
-      Await.ready(couchDBInfoFuture, 5 seconds)
+      Await.result(result, 5 seconds)
+    }
+  }
+
+  describe("Active Tasks") {
+    it("should have no currently running tasks"){
+
+      val future = CouchDb.activeTasks()
+
+      val result = future map { value =>
+        assert(value.size == 0)
+      }
+
+      Await.result(result, 5 seconds)
+    }
+  }
+
+  describe("All DBs") {
+    it("should contain a database named _users"){
+
+      val future = CouchDb.allDbs()
+
+      val result = future map { value =>
+        assert(value.contains("_users"))
+      }
+
+      Await.result(result, 5 seconds)
     }
   }
 }

@@ -17,14 +17,7 @@ case class Vendor(version: String, name: String)
 
 case class ActiveTask(pid: String, status: String, task: String, taskType: String)
 
-object DatabaseEvents extends Enumeration {
-  type DatabaseEvents = Value
-  val Created = Value("created")
-  val Updated = Value("updated")
-  val Deleted = Value("deleted")
-}
-
-case class DatabaseEvent(dbName: String, event: DatabaseEvents.DatabaseEvents)
+case class DatabaseEvent(dbName: String, event:String)
 
 object FeedTypes extends Enumeration {
   type FeedTypes = Value
@@ -47,8 +40,8 @@ object CouchDb {
 
 
   implicit val databaseEventReads = (
-    (__ \ "dbname").read[String] ~
-      (__ \ "type").read[DatabaseEvents.DatabaseEvents]
+      (__ \ "dbname").read[String] ~
+      (__ \ "type").read[String]
     )(DatabaseEvent.apply _)
 
   /**
