@@ -4,7 +4,6 @@ import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import dispatch.{url, Http, as}
 import dispatch.stream.StringsByLine
 
 case class CouchDb(host: String = "127.0.0.1", port: Int = 5984) {
@@ -50,10 +49,8 @@ object CouchDb {
    * @return
    */
   def info()(implicit couchDb: CouchDb = CouchDb()): Future[CouchDbInfo] = {
-    val request = url(couchDb.url).GET
-    val response = Http(request OK as.String)
-    val result = for (serverInfo <- response) yield Json.fromJson[CouchDbInfo](Json.parse(serverInfo)).get
-    result
+    for(res <- Requests.get(couchDb.url))
+    yield Json.fromJson[CouchDbInfo](Json.parse(res)).get
   }
 
   /**
@@ -62,10 +59,8 @@ object CouchDb {
    * @return
    */
   def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[Vector[ActiveTask]] = {
-    val request = url(couchDb.url + "/_active_tasks").GET
-    val response = Http(request OK as.String)
-    val result = for (activeTasks <- response) yield Json.fromJson[Vector[ActiveTask]](Json.parse(activeTasks)).get
-    result
+    for(res <- Requests.get(couchDb.url + "/_active_tasks"))
+    yield Json.fromJson[Vector[ActiveTask]](Json.parse(res)).get
   }
 
   /**
@@ -74,10 +69,8 @@ object CouchDb {
    * @return
    */
   def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
-    val request = url(couchDb.url + "/_all_dbs").GET
-    val response = Http(request OK as.String)
-    val result = for (allDbs <- response) yield Json.parse(allDbs).as[Vector[String]]
-    result
+    for(res <- Requests.get(couchDb.url + "/_all_dbs"))
+    yield Json.parse(res).as[Vector[String]]
   }
 
   /**
@@ -88,15 +81,11 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def updates(feed: FeedTypes.FeedTypes = FeedTypes.LongPoll,
-                timeout: Long = 60,
-                heartbeat: Boolean = true,
+  def updates(feed: FeedTypes.FeedTypes = FeedTypes.LongPoll, timeout: Long = 60, heartbeat: Boolean = true,
                 callBack: DatabaseEvent => Unit)
                (implicit couchDb: CouchDb = CouchDb()): Object with StringsByLine[Unit] = {
-    val request = url(couchDb.url + s"/_db_updates?feed=${feed.toString}&timeout=$timeout&heartbeat=$heartbeat").GET
-    val callBacker = as.stream.Lines(line => callBack(Json.fromJson[DatabaseEvent](Json.parse(line)).get))
-    Http(request > callBacker)
-    callBacker
+    Requests.getStream(couchDb.url + s"/_db_updates?feed=${feed.toString}&timeout=$timeout&heartbeat=$heartbeat",
+    line => callBack(Json.fromJson[DatabaseEvent](Json.parse(line)).get))
   }
 
   /**
@@ -107,10 +96,8 @@ object CouchDb {
    * @return
    */
   def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb()): Future[String] = {
-    val request = url(couchDb.url + s"/_log?bytes=$bytes&offset=$offset").GET
-    val response = Http(request OK as.String)
-    val result = for (log <- response) yield log
-    result
+    for(res <- Requests.get(couchDb.url + s"/_log?bytes=$bytes&offset=$offset"))
+    yield res
   }
 
   /**
@@ -124,11 +111,8 @@ object CouchDb {
    */
   def replicate(bytes: Long = 1000, offset: Long = 0, replicationSpecification: JsValue)
                (implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
-    val request = url(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset").POST <<
-      Json.stringify(replicationSpecification)
-    val response = Http(request OK as.String)
-    val result = for (res <- response) yield Json.parse(res)
-    result
+    for(res <- Requests.post(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset", body = Json.stringify(replicationSpecification)))
+    yield Json.parse(res)
   }
 
   /**
@@ -137,10 +121,8 @@ object CouchDb {
    * @return
    */
   def restart()(implicit couchDb: CouchDb = CouchDb()): Future[Boolean] = {
-    val request = url(couchDb.url + s"/_restart").POST.addHeader("Content-Type", "application/json")
-    val response = Http(request OK as.String)
-    val result = for (res <- response) yield (Json.parse(res) \ "ok").as[Boolean]
-    result
+    for(res <- Requests.post(couchDb.url + s"/_restart", headers = Map("Content-Type" -> "application/json")))
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 
   /**
@@ -149,10 +131,8 @@ object CouchDb {
    * @return
    */
   def stats()(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
-    val request = url(couchDb.url + s"/_stats").GET
-    val response = Http(request OK as.String)
-    val result = for (res <- response) yield Json.parse(res)
-    result
+    for(res <- Requests.get(couchDb.url + s"/_stats"))
+    yield Json.parse(res)
   }
 
   /**
@@ -162,9 +142,7 @@ object CouchDb {
    * @return
    */
   def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
-    val request = url(couchDb.url + s"/_uuids?count=$count").GET
-    val response = Http(request OK as.String)
-    val result = for (uuids <- response) yield (Json.parse(uuids) \ "uuids").as[Vector[String]]
-    result
+    for(res <- Requests.post(couchDb.url + s"/_uuids?count=$count"))
+    yield (Json.parse(res) \ "uuids").as[Vector[String]]
   }
 }

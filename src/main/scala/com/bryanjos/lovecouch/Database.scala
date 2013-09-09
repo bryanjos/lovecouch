@@ -8,15 +8,24 @@ import dispatch.{url, Http, as}
 import dispatch.stream.StringsByLine
 
 
-case class Database(name:String, couchDb:CouchDb=CouchDb()) { def url:String = couchDb.url + s"/$name" }
-case class DatabaseInfo(dbName:String, docCount:Long, docDelCount:Long,
-                    updateSeq:Long, purgeSeq:Long, compactRunning:Boolean,
-                    diskSize:Long, dataSize:Long, instanceStartTime:String,
-                    diskFormatVersion:Long, committedUpdateSeq:Long)
+case class Database(name: String, couchDb: CouchDb = CouchDb()) {
+  def url: String = couchDb.url + s"/$name"
+}
+
+case class DatabaseInfo(dbName: String, docCount: Long, docDelCount: Long,
+                        updateSeq: Long, purgeSeq: Long, compactRunning: Boolean,
+                        diskSize: Long, dataSize: Long, instanceStartTime: String,
+                        diskFormatVersion: Long, committedUpdateSeq: Long)
+
+case class EnsureFullCommitResult(ok: Boolean, instanceStartTime: String)
+
+case class SecurityGroup(roles: Vector[String], names: Vector[String])
+
+case class Security(admins: Option[SecurityGroup], readers: Option[SecurityGroup])
 
 object Database {
   implicit val databaseInfoReads = (
-      (__ \ "db_name").read[String] ~
+    (__ \ "db_name").read[String] ~
       (__ \ "doc_count").read[Long] ~
       (__ \ "doc_del_count").read[Long] ~
       (__ \ "update_seq").read[Long] ~
@@ -30,16 +39,23 @@ object Database {
     )(DatabaseInfo.apply _)
 
 
+  implicit val ensureFullCommitResultReads = (
+    (__ \ "ok").read[Boolean] ~
+      (__ \ "instance_start_time").read[String]
+    )(EnsureFullCommitResult.apply _)
+
+  implicit val securityGroupFmt = Json.format[SecurityGroup]
+  implicit val securityFmt = Json.format[Security]
+
+
   /**
    * Gets information about the specified database.
    * @param database
    * @return
    */
-  def info()(implicit database:Database): Future[DatabaseInfo] = {
-    val request = url(database.url).GET
-    val response = Http(request OK as.String)
-    val result = for (database <- response) yield Json.fromJson[DatabaseInfo](Json.parse(database)).get
-    result
+  def info()(implicit database: Database): Future[DatabaseInfo] = {
+    for(res <- Requests.get(database.url))
+    yield Json.fromJson[DatabaseInfo](Json.parse(res)).get
   }
 
   /**
@@ -47,11 +63,9 @@ object Database {
    * @param database
    * @return
    */
-  def create()(implicit database:Database): Future[Boolean] = {
-    val request = url(database.url).PUT
-    val response = Http(request OK as.String)
-    val result = for (createResult <- response) yield (Json.parse(createResult) \ "ok").as[Boolean]
-    result
+  def create()(implicit database: Database): Future[Boolean] = {
+    for(res <- Requests.put(database.url))
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 
   /**
@@ -59,11 +73,9 @@ object Database {
    * @param database
    * @return
    */
-  def delete()(implicit database:Database): Future[Boolean] = {
-    val request = url(database.url).DELETE
-    val response = Http(request OK as.String)
-    val result = for (createResult <- response) yield (Json.parse(createResult) \ "ok").as[Boolean]
-    result
+  def delete()(implicit database: Database): Future[Boolean] = {
+    for(res <- Requests.delete(database.url))
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 
 
@@ -80,23 +92,107 @@ object Database {
    * @param database
    * @return
    */
-  def changes(docIds:Option[List[String]] = None, feed:FeedTypes.FeedTypes=FeedTypes.Normal,
-              filter:Option[String], heartBeat:Long=6000, includeDocs:Boolean=false,
-              limit:Option[Long]= None, since:Long=0, callBack: JsValue => Unit)
-             (implicit database:Database): Object with StringsByLine[Unit] = {
+  def changes(docIds: Option[List[String]] = None, feed: FeedTypes.FeedTypes = FeedTypes.Normal,
+              filter: Option[String], heartBeat: Long = 6000, includeDocs: Boolean = false,
+              limit: Option[Long] = None, since: Long = 0, callBack: JsValue => Unit)
+             (implicit database: Database): Object with StringsByLine[Unit] = {
 
-    val d = docIds.map{ids => "doc_ids"-> Json.stringify(Json.toJson(ids))}.orElse(Some(""->"")).get
-    val fr = filter.map{fil => "filter"-> fil}.orElse(Some(""->"")).get
-    val lt = limit.map{ids => "limit"-> ids.toString}.orElse(Some(""->"")).get
+    val d = docIds.map {
+      ids => "doc_ids" -> Json.stringify(Json.toJson(ids))
+    }.orElse(Some("" -> "")).get
+    val fr = filter.map {
+      fil => "filter" -> fil
+    }.orElse(Some("" -> "")).get
+    val lt = limit.map {
+      ids => "limit" -> ids.toString
+    }.orElse(Some("" -> "")).get
     val f = "feed" -> feed.toString
     val hb = "heartbeat" -> heartBeat.toString
     val id = "include_docs" -> includeDocs.toString
     val sn = "since" -> since.toString
 
     val map = Map() + d + fr + lt + f + hb + id + sn - ""
-    val request = url(database.url + s"/_changes").GET <<? map
-    val callBacker = as.stream.Lines(line => callBack(Json.parse(line)))
-    Http(request > callBacker)
-    callBacker
+    Requests.getStream(database.url + s"/_changes", line => callBack(Json.parse(line)), parameters = map)
+  }
+
+  /**
+   * Request compaction of the specified database.
+   * @param designDocName Optionally compacts the view indexes associated with the specified design document.
+   * @param database
+   * @return
+   */
+  def compact(designDocName: Option[String] = None)(implicit database: Database): Future[Boolean] = {
+    for(res <- Requests.post(database.url + s"/_compact" + designDocName.map(d => s"/$designDocName").orElse(Some("")).get,
+      headers = Map("Content-Type" -> "application/json")))
+    yield (Json.parse(res) \ "ok").as[Boolean]
+  }
+
+  /**
+   * Cleans up the cached view output on disk for a given view.
+   * @param database
+   * @return
+   */
+  def viewCleanUp()(implicit database: Database): Future[Boolean] = {
+    for(res <- Requests.post(database.url + s"/_view_cleanup", headers = Map("Content-Type" -> "application/json")))
+    yield (Json.parse(res) \ "ok").as[Boolean]
+  }
+
+  /**
+   * Commits any recent changes to the specified database to disk.
+   * @param database
+   * @return
+   */
+  def ensureFullCommit()(implicit database: Database): Future[EnsureFullCommitResult] = {
+    for(res <- Requests.post(database.url + s"/_ensure_full_commit", headers = Map("Content-Type" -> "application/json")))
+    yield Json.fromJson[EnsureFullCommitResult](Json.parse(res)).get
+  }
+
+
+  /**
+   * Gets the current security object from the specified database.
+   * @param database
+   * @return
+   */
+  def security()(implicit database: Database): Future[Security] = {
+    for(res <- Requests.get(database.url + s"/_security"))
+    yield Json.fromJson[Security](Json.parse(res)).get
+  }
+
+  /**
+   * Sets the security object for the given database.
+   * @param security
+   * @param database
+   * @return
+   */
+  def setSecurity(security: Security)(implicit database: Database): Future[Boolean] = {
+    for(res <- Requests.post(database.url + s"/_security",
+      body= Json.stringify(Json.toJson(security)),
+      headers = Map("Content-Type" -> "application/json")))
+    yield (Json.parse(res) \ "ok").as[Boolean]
+  }
+
+
+  /**
+   * Gets the current revs_limit (revision limit) setting.
+   * @param database
+   * @return
+   */
+  def revsLimit()(implicit database: Database): Future[Int] = {
+    for(res <- Requests.get(database.url + s"/_revs_limit",
+      headers = Map("Content-Type" -> "application/json")))
+    yield res.toInt
+  }
+
+  /**
+   * Sets the maximum number of document revisions that will be tracked by CouchDB, even after compaction has occurred.
+   * @param limit
+   * @param database
+   * @return
+   */
+  def setRevsLimit(limit: Int)(implicit database: Database): Future[Boolean] = {
+    for(res <- Requests.put(database.url + s"/_revs_limit",
+      body= limit.toString,
+      headers = Map("Content-Type" -> "application/json")))
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 }

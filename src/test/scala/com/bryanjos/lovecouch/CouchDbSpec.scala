@@ -56,29 +56,11 @@ class CouchDbSpec extends FunSpec {
   }
 
 
-  describe("Log") {
-    it("should contain 'GET /_log'"){
-
-      val future = CouchDb.log()
-
-      val result = future map { value =>
-        assert(value.contains("GET /_log"))
-      }
-
-      Await.result(result, 5 seconds)
-    }
-  }
-
-
   describe("Stats") {
     it("should not fail"){
 
       val future = CouchDb.stats()
-
-      val result = future map { value =>
-        println(value)
-      }
-
+      val result = future map { value => }
       Await.result(result, 5 seconds)
     }
   }
