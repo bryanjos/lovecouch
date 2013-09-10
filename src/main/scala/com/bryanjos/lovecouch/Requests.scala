@@ -38,6 +38,13 @@ object Requests {
     result
   }
 
+  def getBytes(url:String, parameters:Map[String,String] = Map[String,String](), headers:Map[String, String] = Map[String,String]()):Future[Array[Byte]] = {
+    val request = buildHeaders(buildQueryParameters(dispatch.url(url).GET, parameters.toSeq), headers.toSeq)
+    val response = dispatch.Http(request OK as.Bytes)
+    val result = for (res <- response) yield res
+    result
+  }
+
   def getStream(url:String, callback:String => Unit, parameters:Map[String,String] = Map[String,String](), headers:Map[String, String] = Map[String,String]()):Object with StringsByLine[Unit] = {
     val request = buildHeaders(buildQueryParameters(dispatch.url(url).GET, parameters.toSeq), headers.toSeq)
     val callBacker = as.stream.Lines(callback)
@@ -54,6 +61,13 @@ object Requests {
 
   def put(url:String, body:String = "", parameters:Map[String,String] = Map[String,String](), headers:Map[String, String] = Map[String,String]()):Future[String] = {
     val request = buildBody(buildHeaders(buildQueryParameters(dispatch.url(url).PUT, parameters.toSeq), headers.toSeq), body)
+    val response = dispatch.Http(request OK as.String)
+    val result = for (res <- response) yield res
+    result
+  }
+
+  def putFile(url:String, file:java.io.File, parameters:Map[String,String] = Map[String,String](), headers:Map[String, String] = Map[String,String]()):Future[String] = {
+    val request = buildHeaders(buildQueryParameters(dispatch.url(url).PUT, parameters.toSeq), headers.toSeq) <<< file
     val response = dispatch.Http(request OK as.String)
     val result = for (res <- response) yield res
     result
