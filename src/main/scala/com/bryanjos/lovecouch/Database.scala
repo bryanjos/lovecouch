@@ -3,6 +3,7 @@ package com.bryanjos.lovecouch
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
+import play.api.libs.functional.syntax._
 import dispatch.stream.StringsByLine
 
 
@@ -10,16 +11,58 @@ case class Database(name: String, couchDb: CouchDb = CouchDb()) {
   def url: String = couchDb.url + s"/$name"
 }
 
+case class DatabaseInfo(dbName: String, docCount: Long, docDelCount: Long,
+                        updateSeq: Long, purgeSeq: Long, compactRunning: Boolean,
+                        diskSize: Long, dataSize: Long, instanceStartTime: String,
+                        diskFormatVersion: Long, committedUpdateSeq: Long)
+
+case class EnsureFullCommitResult(ok: Boolean, instanceStartTime: String)
+
+case class SecurityGroup(roles: Vector[String], names: Vector[String])
+
+case class Security(admins: Option[SecurityGroup], readers: Option[SecurityGroup])
+
+case class RowValue(rev:String)
+case class Row(id:String, key:String, value:RowValue)
+case class AllDocsResult(offset:Long, rows:Vector[Row])
+
+case class View(map:String, reduce:Option[String])
+
 object Database {
+  implicit val databaseInfoReads = (
+    (__ \ "db_name").read[String] ~
+      (__ \ "doc_count").read[Long] ~
+      (__ \ "doc_del_count").read[Long] ~
+      (__ \ "update_seq").read[Long] ~
+      (__ \ "purge_seq").read[Long] ~
+      (__ \ "compact_running").read[Boolean] ~
+      (__ \ "disk_size").read[Long] ~
+      (__ \ "data_size").read[Long] ~
+      (__ \ "instance_start_time").read[String] ~
+      (__ \ "disk_format_version").read[Long] ~
+      (__ \ "committed_update_seq").read[Long]
+    )(DatabaseInfo.apply _)
+
+    implicit val ensureFullCommitResultReads = (
+      (__ \ "ok").read[Boolean] ~
+        (__ \ "instance_start_time").read[String]
+      )(EnsureFullCommitResult.apply _)
+
+    implicit val securityGroupFmt = Json.format[SecurityGroup]
+    implicit val securityFmt = Json.format[Security]
+    implicit val rowValueFmt = Json.format[RowValue]
+    implicit val rowFmt = Json.format[Row]
+    implicit val allDocsResultFmt = Json.format[AllDocsResult]
+    implicit val viewFmt = Json.format[View]
 
   /**
    * Gets information about the specified database.
    * @param database
    * @return
    */
-  def info()(implicit database: Database): Future[JsValue] = {
+  def info()(implicit database: Database): Future[DatabaseInfo] = {
     for(res <- Requests.get(database.url))
-    yield Json.parse(res)
+    yield Json.fromJson[DatabaseInfo](Json.parse(res)).get
   }
 
   /**
@@ -27,9 +70,9 @@ object Database {
    * @param database
    * @return
    */
-  def create()(implicit database: Database): Future[JsValue] = {
+  def create()(implicit database: Database): Future[Boolean] = {
     for(res <- Requests.put(database.url))
-    yield Json.parse(res)
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 
   /**
@@ -37,9 +80,9 @@ object Database {
    * @param database
    * @return
    */
-  def delete()(implicit database: Database): Future[JsValue] = {
+  def delete()(implicit database: Database): Future[Boolean] = {
     for(res <- Requests.delete(database.url))
-    yield Json.parse(res)
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 
 
@@ -85,10 +128,10 @@ object Database {
    * @param database
    * @return
    */
-  def compact(designDocName: Option[String] = None)(implicit database: Database): Future[JsValue] = {
+  def compact(designDocName: Option[String] = None)(implicit database: Database): Future[Boolean] = {
     for(res <- Requests.post(database.url + "/_compact" + designDocName.map(d => s"/$designDocName").orElse(Some("")).get,
       headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 
   /**
@@ -96,53 +139,42 @@ object Database {
    * @param database
    * @return
    */
-  def viewCleanUp()(implicit database: Database): Future[JsValue] = {
+  def viewCleanUp()(implicit database: Database): Future[Boolean] = {
     for(res <- Requests.post(database.url + "/_view_cleanup", headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
-
   /**
    * Commits any recent changes to the specified database to disk.
    * @param database
    * @return
    */
-  def ensureFullCommit()(implicit database: Database): Future[JsValue] = {
+  def ensureFullCommit()(implicit database: Database): Future[EnsureFullCommitResult] = {
     for(res <- Requests.post(database.url + "/_ensure_full_commit", headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    yield Json.fromJson[EnsureFullCommitResult](Json.parse(res)).get
   }
-
 
   /**
    * Allows you to create and update multiple documents at the same time within a single request.
-   * @param json
+   * @param docs
    * @param database
    * @return
    */
-  def bulkDocs(json:JsValue)(implicit database: Database): Future[JsValue] = {
+  def bulkDocs[T](docs:Seq[T])(implicit database: Database, writes: Writes[T]): Future[JsValue] = {
+    val json = Json.obj("docs" -> Json.toJson(docs))
     for(res <- Requests.post(database.url + "/_bulk_docs", body=Json.stringify(json), headers = Map("Content-Type" -> "application/json")))
     yield Json.parse(res)
   }
 
   /**
    * Creates (and executes) a temporary view based on the view function supplied in the JSON request.
-   * @param json
+   * @param view
    * @param database
    * @return
    */
-  def tempView(json:JsValue)(implicit database: Database): Future[JsValue] = {
-    for(res <- Requests.post(database.url + "/_temp_view", body=Json.stringify(json), headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
-  }
-
-  /**
-   * Permanently removes the references to deleted documents from the database.
-   * @param json
-   * @param database
-   * @return
-   */
-  def purge(json:JsValue)(implicit database: Database): Future[JsValue] = {
-    for(res <- Requests.post(database.url + "/_purge", body=Json.stringify(json), headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+  def tempView[T](view:View)(implicit database: Database, reads: Reads[T]): Future[Vector[T]] = {
+    for(res <- Requests.post(database.url + "/_temp_view", body=Json.stringify(Json.toJson(view)),
+      headers = Map("Content-Type" -> "application/json")))
+    yield (Json.parse(res) \ "rows").as[Vector[T]]
   }
 
   /**
@@ -164,14 +196,21 @@ object Database {
    * @param database
    * @return
    */
-  def allDocs(descending:Boolean=false, endKey:Option[String]=None,
-              endKeyDocId:Option[String]=None, group:Boolean=false,
-              groupLevel:Option[Long]=None, includeDocs:Boolean=false,
-               inclusiveEnd:Boolean = true, key:Option[String]=None,
-               limit:Option[Long]=None, reduce:Boolean=true, skip:Long=0,
-               stale:Option[String]=None, startKey:Option[String]=None,
-               startKeyDocId:Option[String]=None)
-             (implicit database: Database): Future[JsValue] = {
+  def allDocs(descending:Boolean=false,
+              endKey:Option[String]=None,
+              endKeyDocId:Option[String]=None,
+              group:Boolean=false,
+              groupLevel:Option[Long]=None,
+              includeDocs:Boolean=false,
+              inclusiveEnd:Boolean = true,
+              key:Option[String]=None,
+              limit:Option[Long]=None,
+              reduce:Boolean=true,
+              skip:Long=0,
+              stale:Option[String]=None,
+              startKey:Option[String]=None,
+              startKeyDocId:Option[String]=None)
+             (implicit database: Database): Future[AllDocsResult] = {
 
 
     val map = Map[String, String]() +
@@ -192,47 +231,20 @@ object Database {
 
 
     for(res <- Requests.get(database.url + "/_all_docs", parameters=map, headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    yield Json.fromJson[AllDocsResult](Json.parse(res)).get
   }
 
   /**
    * The POST to _all_docs allows to specify multiple keys to be selected from the database.
-   * @param json
+   * @param keys
    * @param database
    * @return
    */
-  def postAllDocs(json:JsValue)(implicit database: Database): Future[JsValue] = {
+  def allDocs(keys:Vector[String])(implicit database: Database): Future[AllDocsResult] = {
     for(res <- Requests.post(database.url + s"/_all_docs",
-      body= Json.stringify(json),
+      body= Json.stringify(Json.obj("keys" -> keys)),
       headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
-  }
-
-
-  /**
-   *
-   * @param json
-   * @param database
-   * @return
-   */
-  def missingRevisions(json:JsValue)(implicit database: Database): Future[JsValue] = {
-    for(res <- Requests.post(database.url + s"/_missing_revs",
-      body= Json.stringify(json),
-      headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
-  }
-
-  /**
-   *
-   * @param json
-   * @param database
-   * @return
-   */
-  def revisionDiff(json:JsValue)(implicit database: Database): Future[JsValue] = {
-    for(res <- Requests.post(database.url + s"/_revs_diff",
-      body= Json.stringify(json),
-      headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    yield Json.fromJson[AllDocsResult](Json.parse(res)).get
   }
 
 
@@ -241,22 +253,22 @@ object Database {
    * @param database
    * @return
    */
-  def security()(implicit database: Database): Future[JsValue] = {
+  def security()(implicit database: Database): Future[Security] = {
     for(res <- Requests.get(database.url + s"/_security"))
-    yield Json.parse(res)
+    yield Json.fromJson[Security](Json.parse(res)).get
   }
 
   /**
    * Sets the security object for the given database.
-   * @param json
+   * @param security
    * @param database
    * @return
    */
-  def setSecurity(json:JsValue)(implicit database: Database): Future[JsValue] = {
+  def setSecurity(security: Security)(implicit database: Database): Future[Boolean] = {
     for(res <- Requests.post(database.url + s"/_security",
-      body= Json.stringify(json),
+      body= Json.stringify(Json.toJson(security)),
       headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 
 
@@ -278,10 +290,10 @@ object Database {
    * @param database
    * @return
    */
-  def setRevsLimit(limit: Int)(implicit database: Database): Future[JsValue] = {
+  def setRevsLimit(limit: Int)(implicit database: Database): Future[Boolean] = {
     for(res <- Requests.put(database.url + s"/_revs_limit",
       body= limit.toString,
       headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    yield (Json.parse(res) \ "ok").as[Boolean]
   }
 }

@@ -4,7 +4,10 @@ import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
 
+case class DocumentResult(ok:Boolean, id:String, rev:String)
+
 object Document {
+  implicit val documentResultFmt = Json.format[DocumentResult]
 
   /**
    * Create a new document in the specified database.
@@ -13,9 +16,9 @@ object Document {
    * @param database
    * @return
    */
-  def post(json:JsValue)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.post(database.url, body = Json.stringify(json), headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+  def post[T](doc:T)(implicit database:Database, writes: Writes[T]): Future[DocumentResult] = {
+    for(res <- Requests.post(database.url, body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
   /**
@@ -25,9 +28,9 @@ object Document {
    * @param database
    * @return
    */
-  def get(id:String, rev:Option[String] = None)(implicit database:Database): Future[JsValue] = {
+  def get[T](id:String, rev:Option[String] = None)(implicit database:Database, reads: Reads[T]): Future[T] = {
     for(res <- Requests.get(database.url + s"/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
-    yield Json.parse(res)
+    yield Json.fromJson[T](Json.parse(res)).get
   }
 
   /**
@@ -37,33 +40,33 @@ object Document {
    * @param database
    * @return
    */
-  def getLocal(id:String, rev:Option[String] = None)(implicit database:Database): Future[JsValue] = {
+  def getLocal[T](id:String, rev:Option[String] = None)(implicit database:Database, reads: Reads[T]): Future[T] = {
     for(res <- Requests.get(database.url + s"/_local/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
-    yield Json.parse(res)
+    yield Json.fromJson[T](Json.parse(res)).get
   }
 
   /**
    * creates a new named document, or creates a new revision of the existing document.
-   * @param json
+   * @param doc
    * @param id
    * @param database
    * @return
    */
-  def put(json:JsValue, id:String)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.put(database.url + s"/$id", body = Json.stringify(json), headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+  def put[T](doc:T, id:String)(implicit database:Database, writes: Writes[T]): Future[DocumentResult] = {
+    for(res <- Requests.put(database.url + s"/$id", body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
   /**
    * Stores the specified local document.
-   * @param json
+   * @param doc
    * @param id
    * @param database
    * @return
    */
-  def putLocal(json:JsValue, id:String)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.put(database.url  + s"/_local/$id", body = Json.stringify(json), headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+  def putLocal[T](doc:T, id:String)(implicit database:Database, writes: Writes[T]): Future[DocumentResult] = {
+    for(res <- Requests.put(database.url  + s"/_local/$id", body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
 
@@ -74,9 +77,9 @@ object Document {
    * @param database
    * @return
    */
-  def delete(id:String, rev:Option[String] = None)(implicit database:Database): Future[JsValue] = {
+  def delete(id:String, rev:Option[String] = None)(implicit database:Database): Future[DocumentResult] = {
     for(res <- Requests.delete(database.url + s"/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
-    yield Json.parse(res)
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
 
@@ -87,9 +90,9 @@ object Document {
    * @param database
    * @return
    */
-  def deleteLocal(id:String, rev:Option[String] = None)(implicit database:Database): Future[JsValue] = {
+  def deleteLocal(id:String, rev:Option[String] = None)(implicit database:Database): Future[DocumentResult] = {
     for(res <- Requests.delete(database.url + s"/_local/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
-    yield Json.parse(res)
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
   /**
@@ -113,11 +116,11 @@ object Document {
    * @param database
    * @return
    */
-  def putAttachment(id:String, rev:String, attachmentName:String, attachment:java.io.File, mimeType:String)(implicit database:Database): Future[JsValue] = {
+  def putAttachment(id:String, rev:String, attachmentName:String, attachment:java.io.File, mimeType:String)(implicit database:Database): Future[DocumentResult] = {
     for(res <- Requests.putFile(database.url + s"/$id/$attachmentName", file=attachment,
       parameters = Map("rev"-> rev),
       headers = Map() + ("Content-Length" -> attachment.length().toString) + ("Mime-Type" -> mimeType)))
-    yield Json.parse(res)
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
 
@@ -129,8 +132,8 @@ object Document {
    * @param database
    * @return
    */
-  def deleteAttachment(id:String, rev:String, attachmentName:String)(implicit database:Database): Future[JsValue] = {
+  def deleteAttachment(id:String, rev:String, attachmentName:String)(implicit database:Database): Future[DocumentResult] = {
     for(res <- Requests.delete(database.url + s"/$id/$attachmentName", parameters = Map("rev"-> rev)))
-    yield Json.parse(res)
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 }

@@ -1,9 +1,37 @@
 package com.bryanjos.lovecouch
 
-import scala.concurrent.Future
-import play.api.libs.json.{Json, JsValue}
+import scala.concurrent.{ExecutionContext, Future}
+import play.api.libs.json._
+import play.api.libs.functional.syntax._
+import ExecutionContext.Implicits.global
+import Document.documentResultFmt
+
+
+case class ViewIndex(compactRunning: Boolean, updaterRunning: Boolean, language: String,
+                     purgeSeq: Long, waitingCommit: Boolean,
+                     waitingClients: Long, signature: String, updateSeq: Long, diskSize: Long)
+case class ViewInfo(name: String, viewIndex: ViewIndex)
+case class ViewRow[T](id: String, key: String, value: Vector[String], doc: Option[T])
+case class ViewResult[T](totalRows: Long, rows: Vector[ViewRow[T]], offset: Long)
 
 object DesignDocument {
+  implicit val viewIndexReads = (
+    (__ \ "compact_running").read[Boolean] ~
+      (__ \ "updater_running").read[Boolean] ~
+      (__ \ "language").read[String] ~
+      (__ \ "purge_seq").read[Long] ~
+      (__ \ "waiting_commit").read[Boolean] ~
+      (__ \ "waiting_clients").read[Long] ~
+      (__ \ "signature").read[String] ~
+      (__ \ "update_seq").read[Long] ~
+      (__ \ "disk_size").read[Long]
+    )(ViewIndex.apply _)
+
+
+  implicit val viewInfoReads = (
+    (__ \ "name").read[String] ~
+      (__ \ "view_index").read[ViewIndex]
+    )(ViewInfo.apply _)
 
   /**
    * Returns the specified design document
@@ -12,9 +40,12 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def get(id:String, rev:Option[String] = None)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.get(database.url + s"/_design/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
-    yield Json.parse(res)
+  def get[T](id: String, rev: Option[String] = None)(implicit database: Database, reads: Reads[T]): Future[T] = {
+    for (res <- Requests.get(database.url + s"/_design/$id",
+      parameters = Map(rev.map {
+        r => "rev" -> r
+      }.orElse(Some("" -> "")).get) - ""))
+    yield Json.fromJson[T](Json.parse(res)).get
   }
 
   /**
@@ -24,9 +55,10 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def put(json:JsValue, id:String)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.put(database.url + s"/_design/$id", body = Json.stringify(json), headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+  def put(json: JsValue, id: String)(implicit database: Database): Future[DocumentResult] = {
+    for (res <- Requests.put(database.url + s"/_design/$id", body = Json.stringify(json),
+      headers = Map("Content-Type" -> "application/json")))
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
   /**
@@ -36,11 +68,13 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def delete(id:String, rev:Option[String] = None)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.put(database.url + s"/_design/$id",
-      parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - "",
+  def delete(id: String, rev: Option[String] = None)(implicit database: Database): Future[DocumentResult] = {
+    for (res <- Requests.put(database.url + s"/_design/$id",
+      parameters = Map(rev.map {
+        r => "rev" -> r
+      }.orElse(Some("" -> "")).get) - "",
       headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
 
@@ -51,7 +85,7 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def getAttachment(id:String, attachmentName:String)(implicit database:Database): Future[Array[Byte]] = {
+  def getAttachment(id: String, attachmentName: String)(implicit database: Database): Future[Array[Byte]] = {
     Requests.getBytes(database.url + s"/_design/$id/$attachmentName")
   }
 
@@ -66,11 +100,12 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def putAttachment(id:String, rev:String, attachmentName:String, attachment:java.io.File, mimeType:String)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.putFile(database.url + s"_design/$id/$attachmentName", file=attachment,
-      parameters = Map("rev"-> rev),
+  def putAttachment(id: String, rev: String, attachmentName: String, attachment: java.io.File, mimeType: String)
+                   (implicit database: Database): Future[DocumentResult] = {
+    for (res <- Requests.putFile(database.url + s"_design/$id/$attachmentName", file = attachment,
+      parameters = Map("rev" -> rev),
       headers = Map() + ("Content-Length" -> attachment.length().toString) + ("Mime-Type" -> mimeType)))
-    yield Json.parse(res)
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
   /**
@@ -81,9 +116,9 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def deleteAttachment(id:String, rev:String, attachmentName:String)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.delete(database.url + s"/_design/$id/$attachmentName", parameters = Map("rev"-> rev)))
-    yield Json.parse(res)
+  def deleteAttachment(id: String, rev: String, attachmentName: String)(implicit database: Database): Future[DocumentResult] = {
+    for (res <- Requests.delete(database.url + s"/_design/$id/$attachmentName", parameters = Map("rev" -> rev)))
+    yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
 
@@ -93,74 +128,155 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def info(id:String)(implicit database:Database): Future[JsValue] = {
-    for(res <- Requests.put(database.url + s"/_design/$id/_info", headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+  def info(id: String)(implicit database: Database): Future[ViewInfo] = {
+    for (res <- Requests.put(database.url + s"/_design/$id/_info", headers = Map("Content-Type" -> "application/json")))
+    yield Json.fromJson[ViewInfo](Json.parse(res)).get
   }
 
 
-  def executeView(designDocName:String, viewName:String, descending:Boolean=false, endKey:Option[String]=None,
-              endKeyDocId:Option[String]=None, group:Boolean=false,
-              groupLevel:Option[Long]=None, includeDocs:Boolean=false,
-              inclusiveEnd:Boolean = true, key:Option[String]=None,
-              limit:Option[Long]=None, reduce:Boolean=true, skip:Long=0,
-              stale:Option[String]=None, startKey:Option[String]=None,
-              startKeyDocId:Option[String]=None, updateSeq:Boolean=false)
-             (implicit database: Database): Future[JsValue] = {
+  def executeView[T](designDocName: String, viewName: String, descending: Boolean = false, endKey: Option[String] = None,
+                     endKeyDocId: Option[String] = None, group: Boolean = false,
+                     groupLevel: Option[Long] = None, includeDocs: Boolean = false,
+                     inclusiveEnd: Boolean = true, key: Option[String] = None,
+                     limit: Option[Long] = None, reduce: Boolean = true, skip: Long = 0,
+                     stale: Option[String] = None, startKey: Option[String] = None,
+                     startKeyDocId: Option[String] = None, updateSeq: Boolean = false)
+                    (implicit database: Database, reads: Reads[T]): Future[ViewResult[T]] = {
 
 
     val map = Map[String, String]() +
       ("descending" -> descending.toString) +
-      endKey.map { v => "endkey" -> v }.orElse(Some("" -> "")).get +
-      endKeyDocId.map { v => "endkey_docid" -> v }.orElse(Some("" -> "")).get +
+      endKey.map {
+        v => "endkey" -> v
+      }.orElse(Some("" -> "")).get +
+      endKeyDocId.map {
+        v => "endkey_docid" -> v
+      }.orElse(Some("" -> "")).get +
       ("group" -> group.toString) +
-      groupLevel.map { v => "group_level" -> v.toString }.orElse(Some("" -> "")).get +
+      groupLevel.map {
+        v => "group_level" -> v.toString
+      }.orElse(Some("" -> "")).get +
       ("include_docs" -> includeDocs.toString) +
       ("inclusive_end" -> inclusiveEnd.toString) +
-      key.map { v => "key" -> v }.orElse(Some("" -> "")).get +
-      limit.map { v => "limit" -> v.toString }.orElse(Some("" -> "")).get +
+      key.map {
+        v => "key" -> v
+      }.orElse(Some("" -> "")).get +
+      limit.map {
+        v => "limit" -> v.toString
+      }.orElse(Some("" -> "")).get +
       ("reduce" -> reduce.toString) +
       ("skip" -> skip.toString) +
-      stale.map { v => "stale" -> v }.orElse(Some("" -> "")).get +
-      startKey.map { v => "startkey" -> v }.orElse(Some("" -> "")).get +
-      startKeyDocId.map { v => "startkey_docid" -> v }.orElse(Some("" -> "")).get +
+      stale.map {
+        v => "stale" -> v
+      }.orElse(Some("" -> "")).get +
+      startKey.map {
+        v => "startkey" -> v
+      }.orElse(Some("" -> "")).get +
+      startKeyDocId.map {
+        v => "startkey_docid" -> v
+      }.orElse(Some("" -> "")).get +
       ("update_seq" -> updateSeq.toString)
 
 
-    for(res <- Requests.get(database.url + s"/_design/$designDocName/_view/$viewName", parameters=map, headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    for (res <- Requests.get(database.url + s"/_design/$designDocName/_view/$viewName",
+      parameters = map,
+      headers = Map("Content-Type" -> "application/json")))
+    yield {
+      val json = Json.parse(res)
+
+      ViewResult[T](
+        (json \ "total_rows").as[Long],
+        (json \ "rows").as[List[JsObject]].map {
+          row =>
+            ViewRow[T](
+              (row \ "id").as[String],
+              (row \ "key").as[String],
+              (row \ "value").as[Vector[String]],
+              (row \ "doc").asOpt[T]
+            )
+        }.toVector,
+        (json \ "offset").as[Long]
+      )
+    }
   }
 
-  def executeViewPost(designDocName:String, viewName:String, json:JsValue, descending:Boolean=false, endKey:Option[String]=None,
-                  endKeyDocId:Option[String]=None, group:Boolean=false,
-                  groupLevel:Option[Long]=None, includeDocs:Boolean=false,
-                  inclusiveEnd:Boolean = true, key:Option[String]=None,
-                  limit:Option[Long]=None, reduce:Boolean=true, skip:Long=0,
-                  stale:Option[String]=None, startKey:Option[String]=None,
-                  startKeyDocId:Option[String]=None, updateSeq:Boolean=false)
-                 (implicit database: Database): Future[JsValue] = {
+  def executeViewPost[T](designDocName: String,
+                         viewName: String,
+                         keys: Vector[String],
+                         descending: Boolean = false,
+                         endKey: Option[String] = None,
+                         endKeyDocId: Option[String] = None,
+                         group: Boolean = false,
+                         groupLevel: Option[Long] = None,
+                         includeDocs: Boolean = false,
+                         inclusiveEnd: Boolean = true,
+                         key: Option[String] = None,
+                         limit: Option[Long] = None,
+                         reduce: Boolean = true,
+                         skip: Long = 0,
+                         stale: Option[String] = None,
+                         startKey: Option[String] = None,
+                         startKeyDocId: Option[String] = None,
+                         updateSeq: Boolean = false)
+                        (implicit database: Database, reads: Reads[T]): Future[ViewResult[T]] = {
 
 
     val map = Map[String, String]() +
       ("descending" -> descending.toString) +
-      endKey.map { v => "endkey" -> v }.orElse(Some("" -> "")).get +
-      endKeyDocId.map { v => "endkey_docid" -> v }.orElse(Some("" -> "")).get +
+      endKey.map {
+        v => "endkey" -> v
+      }.orElse(Some("" -> "")).get +
+      endKeyDocId.map {
+        v => "endkey_docid" -> v
+      }.orElse(Some("" -> "")).get +
       ("group" -> group.toString) +
-      groupLevel.map { v => "group_level" -> v.toString }.orElse(Some("" -> "")).get +
+      groupLevel.map {
+        v => "group_level" -> v.toString
+      }.orElse(Some("" -> "")).get +
       ("include_docs" -> includeDocs.toString) +
       ("inclusive_end" -> inclusiveEnd.toString) +
-      key.map { v => "key" -> v }.orElse(Some("" -> "")).get +
-      limit.map { v => "limit" -> v.toString }.orElse(Some("" -> "")).get +
+      key.map {
+        v => "key" -> v
+      }.orElse(Some("" -> "")).get +
+      limit.map {
+        v => "limit" -> v.toString
+      }.orElse(Some("" -> "")).get +
       ("reduce" -> reduce.toString) +
       ("skip" -> skip.toString) +
-      stale.map { v => "stale" -> v }.orElse(Some("" -> "")).get +
-      startKey.map { v => "startkey" -> v }.orElse(Some("" -> "")).get +
-      startKeyDocId.map { v => "startkey_docid" -> v }.orElse(Some("" -> "")).get +
+      stale.map {
+        v => "stale" -> v
+      }.orElse(Some("" -> "")).get +
+      startKey.map {
+        v => "startkey" -> v
+      }.orElse(Some("" -> "")).get +
+      startKeyDocId.map {
+        v => "startkey_docid" -> v
+      }.orElse(Some("" -> "")).get +
       ("update_seq" -> updateSeq.toString)
 
 
-    for(res <- Requests.post(database.url + s"/_design/$designDocName/_view/$viewName", body=Json.stringify(json), parameters=map, headers = Map("Content-Type" -> "application/json")))
-    yield Json.parse(res)
+    for (res <- Requests.post(database.url + s"/_design/$designDocName/_view/$viewName",
+      body = Json.stringify(Json.obj("keys" -> keys)),
+      parameters = map,
+      headers = Map("Content-Type" -> "application/json")
+    ))
+    yield {
+      val json = Json.parse(res)
+
+      ViewResult[T](
+        (json \ "total_rows").as[Long],
+        (json \ "rows").as[List[JsObject]].map {
+          row =>
+            ViewRow[T](
+              (row \ "id").as[String],
+              (row \ "key").as[String],
+              (row \ "value").as[Vector[String]],
+              (row \ "doc").asOpt[T]
+            )
+        }.toVector,
+        (json \ "offset").as[Long]
+      )
+    }
   }
 
 }
