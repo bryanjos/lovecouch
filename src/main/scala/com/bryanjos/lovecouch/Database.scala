@@ -3,7 +3,6 @@ package com.bryanjos.lovecouch
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
-import play.api.libs.functional.syntax._
 import dispatch.stream.StringsByLine
 
 
@@ -11,50 +10,16 @@ case class Database(name: String, couchDb: CouchDb = CouchDb()) {
   def url: String = couchDb.url + s"/$name"
 }
 
-case class DatabaseInfo(dbName: String, docCount: Long, docDelCount: Long,
-                        updateSeq: Long, purgeSeq: Long, compactRunning: Boolean,
-                        diskSize: Long, dataSize: Long, instanceStartTime: String,
-                        diskFormatVersion: Long, committedUpdateSeq: Long)
-
-case class EnsureFullCommitResult(ok: Boolean, instanceStartTime: String)
-
-case class SecurityGroup(roles: Vector[String], names: Vector[String])
-
-case class Security(admins: Option[SecurityGroup], readers: Option[SecurityGroup])
-
 object Database {
-  implicit val databaseInfoReads = (
-    (__ \ "db_name").read[String] ~
-      (__ \ "doc_count").read[Long] ~
-      (__ \ "doc_del_count").read[Long] ~
-      (__ \ "update_seq").read[Long] ~
-      (__ \ "purge_seq").read[Long] ~
-      (__ \ "compact_running").read[Boolean] ~
-      (__ \ "disk_size").read[Long] ~
-      (__ \ "data_size").read[Long] ~
-      (__ \ "instance_start_time").read[String] ~
-      (__ \ "disk_format_version").read[Long] ~
-      (__ \ "committed_update_seq").read[Long]
-    )(DatabaseInfo.apply _)
-
-
-  implicit val ensureFullCommitResultReads = (
-    (__ \ "ok").read[Boolean] ~
-      (__ \ "instance_start_time").read[String]
-    )(EnsureFullCommitResult.apply _)
-
-  implicit val securityGroupFmt = Json.format[SecurityGroup]
-  implicit val securityFmt = Json.format[Security]
-
 
   /**
    * Gets information about the specified database.
    * @param database
    * @return
    */
-  def info()(implicit database: Database): Future[DatabaseInfo] = {
+  def info()(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.get(database.url))
-    yield Json.fromJson[DatabaseInfo](Json.parse(res)).get
+    yield Json.parse(res)
   }
 
   /**
@@ -62,9 +27,9 @@ object Database {
    * @param database
    * @return
    */
-  def create()(implicit database: Database): Future[Boolean] = {
+  def create()(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.put(database.url))
-    yield (Json.parse(res) \ "ok").as[Boolean]
+    yield Json.parse(res)
   }
 
   /**
@@ -72,9 +37,9 @@ object Database {
    * @param database
    * @return
    */
-  def delete()(implicit database: Database): Future[Boolean] = {
+  def delete()(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.delete(database.url))
-    yield (Json.parse(res) \ "ok").as[Boolean]
+    yield Json.parse(res)
   }
 
 
@@ -120,10 +85,10 @@ object Database {
    * @param database
    * @return
    */
-  def compact(designDocName: Option[String] = None)(implicit database: Database): Future[Boolean] = {
+  def compact(designDocName: Option[String] = None)(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.post(database.url + "/_compact" + designDocName.map(d => s"/$designDocName").orElse(Some("")).get,
       headers = Map("Content-Type" -> "application/json")))
-    yield (Json.parse(res) \ "ok").as[Boolean]
+    yield Json.parse(res)
   }
 
   /**
@@ -131,9 +96,9 @@ object Database {
    * @param database
    * @return
    */
-  def viewCleanUp()(implicit database: Database): Future[Boolean] = {
+  def viewCleanUp()(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.post(database.url + "/_view_cleanup", headers = Map("Content-Type" -> "application/json")))
-    yield (Json.parse(res) \ "ok").as[Boolean]
+    yield Json.parse(res)
   }
 
   /**
@@ -141,9 +106,9 @@ object Database {
    * @param database
    * @return
    */
-  def ensureFullCommit()(implicit database: Database): Future[EnsureFullCommitResult] = {
+  def ensureFullCommit()(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.post(database.url + "/_ensure_full_commit", headers = Map("Content-Type" -> "application/json")))
-    yield Json.fromJson[EnsureFullCommitResult](Json.parse(res)).get
+    yield Json.parse(res)
   }
 
 
@@ -230,28 +195,68 @@ object Database {
     yield Json.parse(res)
   }
 
+  /**
+   * The POST to _all_docs allows to specify multiple keys to be selected from the database.
+   * @param json
+   * @param database
+   * @return
+   */
+  def postAllDocs(json:JsValue)(implicit database: Database): Future[JsValue] = {
+    for(res <- Requests.post(database.url + s"/_all_docs",
+      body= Json.stringify(json),
+      headers = Map("Content-Type" -> "application/json")))
+    yield Json.parse(res)
+  }
+
+
+  /**
+   *
+   * @param json
+   * @param database
+   * @return
+   */
+  def missingRevisions(json:JsValue)(implicit database: Database): Future[JsValue] = {
+    for(res <- Requests.post(database.url + s"/_missing_revs",
+      body= Json.stringify(json),
+      headers = Map("Content-Type" -> "application/json")))
+    yield Json.parse(res)
+  }
+
+  /**
+   *
+   * @param json
+   * @param database
+   * @return
+   */
+  def revisionDiff(json:JsValue)(implicit database: Database): Future[JsValue] = {
+    for(res <- Requests.post(database.url + s"/_revs_diff",
+      body= Json.stringify(json),
+      headers = Map("Content-Type" -> "application/json")))
+    yield Json.parse(res)
+  }
+
 
   /**
    * Gets the current security object from the specified database.
    * @param database
    * @return
    */
-  def security()(implicit database: Database): Future[Security] = {
+  def security()(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.get(database.url + s"/_security"))
-    yield Json.fromJson[Security](Json.parse(res)).get
+    yield Json.parse(res)
   }
 
   /**
    * Sets the security object for the given database.
-   * @param security
+   * @param json
    * @param database
    * @return
    */
-  def setSecurity(security: Security)(implicit database: Database): Future[Boolean] = {
+  def setSecurity(json:JsValue)(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.post(database.url + s"/_security",
-      body= Json.stringify(Json.toJson(security)),
+      body= Json.stringify(json),
       headers = Map("Content-Type" -> "application/json")))
-    yield (Json.parse(res) \ "ok").as[Boolean]
+    yield Json.parse(res)
   }
 
 
@@ -266,16 +271,17 @@ object Database {
     yield res.toInt
   }
 
+
   /**
    * Sets the maximum number of document revisions that will be tracked by CouchDB, even after compaction has occurred.
    * @param limit
    * @param database
    * @return
    */
-  def setRevsLimit(limit: Int)(implicit database: Database): Future[Boolean] = {
+  def setRevsLimit(limit: Int)(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.put(database.url + s"/_revs_limit",
       body= limit.toString,
       headers = Map("Content-Type" -> "application/json")))
-    yield (Json.parse(res) \ "ok").as[Boolean]
+    yield Json.parse(res)
   }
 }

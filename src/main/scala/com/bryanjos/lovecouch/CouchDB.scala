@@ -3,54 +3,21 @@ package com.bryanjos.lovecouch
 import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
-import play.api.libs.functional.syntax._
 import dispatch.stream.StringsByLine
 
 case class CouchDb(host: String = "127.0.0.1", port: Int = 5984) {
   def url: String = s"http://$host:$port"
 }
 
-case class CouchDbInfo(couchdb: String, version: String, uuid: String, vendor: Vendor)
-
-case class Vendor(version: String, name: String)
-
-case class ActiveTask(pid: String, status: String, task: String, taskType: String)
-
-case class DatabaseEvent(dbName: String, event:String)
-
-object FeedTypes extends Enumeration {
-  type FeedTypes = Value
-  val LongPoll = Value("longpoll")
-  val Continuous = Value("continuous")
-  val EventSource = Value("eventsource")
-  val Normal = Value("normal")
-}
-
 object CouchDb {
-  implicit val vendorFmt = Json.format[Vendor]
-  implicit val couchDbInfoFmt = Json.format[CouchDbInfo]
-
-  implicit val activeTaskReads = (
-    (__ \ "pid").read[String] ~
-      (__ \ "status").read[String] ~
-      (__ \ "task").read[String] ~
-      (__ \ "type").read[String]
-    )(ActiveTask.apply _)
-
-
-  implicit val databaseEventReads = (
-      (__ \ "dbname").read[String] ~
-      (__ \ "type").read[String]
-    )(DatabaseEvent.apply _)
-
   /**
    * Meta information about the instance
    * @param couchDb
    * @return
    */
-  def info()(implicit couchDb: CouchDb = CouchDb()): Future[CouchDbInfo] = {
+  def info()(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
     for(res <- Requests.get(couchDb.url))
-    yield Json.fromJson[CouchDbInfo](Json.parse(res)).get
+    yield Json.parse(res)
   }
 
   /**
@@ -58,9 +25,9 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[Vector[ActiveTask]] = {
+  def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
     for(res <- Requests.get(couchDb.url + "/_active_tasks"))
-    yield Json.fromJson[Vector[ActiveTask]](Json.parse(res)).get
+    yield Json.parse(res)
   }
 
   /**
@@ -68,9 +35,9 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
+  def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
     for(res <- Requests.get(couchDb.url + "/_all_dbs"))
-    yield Json.parse(res).as[Vector[String]]
+    yield Json.parse(res)
   }
 
   /**
@@ -81,11 +48,11 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def updates(feed: FeedTypes.FeedTypes = FeedTypes.LongPoll, timeout: Long = 60, heartbeat: Boolean = true,
-                callBack: DatabaseEvent => Unit)
+  def updates(feed: String, timeout: Long = 60, heartbeat: Boolean = true,
+                callBack: JsValue => Unit)
                (implicit couchDb: CouchDb = CouchDb()): Object with StringsByLine[Unit] = {
-    Requests.getStream(couchDb.url + s"/_db_updates?feed=${feed.toString}&timeout=$timeout&heartbeat=$heartbeat",
-    line => callBack(Json.fromJson[DatabaseEvent](Json.parse(line)).get))
+    Requests.getStream(couchDb.url + s"/_db_updates?feed=${feed}&timeout=$timeout&heartbeat=$heartbeat",
+    line => callBack(Json.parse(line)))
   }
 
   /**
@@ -120,9 +87,9 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def restart()(implicit couchDb: CouchDb = CouchDb()): Future[Boolean] = {
+  def restart()(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
     for(res <- Requests.post(couchDb.url + s"/_restart", headers = Map("Content-Type" -> "application/json")))
-    yield (Json.parse(res) \ "ok").as[Boolean]
+    yield Json.parse(res)
   }
 
   /**
@@ -141,8 +108,8 @@ object CouchDb {
    * @param count
    * @return
    */
-  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
+  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
     for(res <- Requests.post(couchDb.url + s"/_uuids?count=$count"))
-    yield (Json.parse(res) \ "uuids").as[Vector[String]]
+    yield Json.parse(res)
   }
 }
