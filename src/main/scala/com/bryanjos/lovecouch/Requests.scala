@@ -5,6 +5,8 @@ import ExecutionContext.Implicits.global
 import dispatch.{Http, as}
 import dispatch.stream.StringsByLine
 
+
+
 object Requests {
   def buildQueryParameters(req:dispatch.Req, parameters:Seq[(String,String)]):dispatch.Req = {
     if(parameters.size == 0)
@@ -31,7 +33,7 @@ object Requests {
 
   def get(url:String, parameters:Map[String,String] = Map[String,String](), headers:Map[String, String] = Map[String,String]()):Future[String] = {
     val request = buildHeaders(buildQueryParameters(dispatch.url(url).GET, parameters.toSeq), headers.toSeq)
-    val response = Http(request OK as.String)
+    val response = dispatch.Http(request OK as.String)
     val result = for (res <- response) yield res
     result
   }
@@ -45,21 +47,21 @@ object Requests {
 
   def post(url:String, body:String = "", parameters:Map[String,String] = Map[String,String](), headers:Map[String, String] = Map[String,String]()):Future[String] = {
     val request = buildBody(buildHeaders(buildQueryParameters(dispatch.url(url).POST, parameters.toSeq), headers.toSeq), body)
-    val response = Http(request OK as.String)
+    val response = dispatch.Http(request OK as.String)
     val result = for (res <- response) yield res
     result
   }
 
   def put(url:String, body:String = "", parameters:Map[String,String] = Map[String,String](), headers:Map[String, String] = Map[String,String]()):Future[String] = {
     val request = buildBody(buildHeaders(buildQueryParameters(dispatch.url(url).PUT, parameters.toSeq), headers.toSeq), body)
-    val response = Http(request OK as.String)
+    val response = dispatch.Http(request OK as.String)
     val result = for (res <- response) yield res
     result
   }
 
   def delete(url:String, parameters:Map[String,String] = Map[String,String](), headers:Map[String, String] = Map[String,String]()):Future[String] = {
     val request = buildHeaders(buildQueryParameters(dispatch.url(url).DELETE, parameters.toSeq), headers.toSeq)
-    val response = Http(request OK as.String)
+    val response = dispatch.Http(request OK as.String)
     val result = for (res <- response) yield res
     result
   }
