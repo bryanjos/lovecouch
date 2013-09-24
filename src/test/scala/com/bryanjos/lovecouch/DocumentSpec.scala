@@ -6,14 +6,14 @@ import ExecutionContext.Implicits.global
 import org.scalatest.{BeforeAndAfter, FunSpec}
 import scala.concurrent.Await
 import play.api.libs.json.Json
+import java.io.File
 
 class DocumentSpec extends FunSpec with BeforeAndAfter{
   implicit val db = Database(name="documentspec")
   case class Guy(_id:Option[String] = None, _rev:Option[String] = None, name:String, age:Long)
   implicit val guyFmt = Json.format[Guy]
   var id = ""
-  var rev = ""
-  var latestRev = ""
+  var revs = List[String]()
 
   //before{
   //  Await.result(Database.create(), 5 seconds)
@@ -26,7 +26,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfter{
 
       val result = Document.post[Guy](data) map { value =>
       id = value.id
-      rev = value.rev
+      revs = revs ++ List[String](value.rev)
       assert(value.ok)
     }
 
@@ -44,11 +44,35 @@ class DocumentSpec extends FunSpec with BeforeAndAfter{
     }
 
     it("should update the document"){
-      val data = Guy(_id = Some(id), _rev = Some(rev), name="Alf", age=24)
+      val data = Guy(_id = Some(id), _rev = Some(revs.last), name="Alf", age=24)
 
       val result = Document.put[Guy](data, id) map { value =>
-        latestRev = value.rev
+        revs = revs ++ List[String](value.rev)
         assert(value.ok)
+      }
+
+      Await.result(result, 5 seconds)
+    }
+
+
+    it("should attach a file"){
+
+      val result = Document.putAttachment(id,
+        revs.last,
+        "README.md",
+        new java.io.File("/Users/bryanjos/Projects/Personal/lovecouch/README.md"),
+        "text/plain") map { value =>
+        revs = revs ++ List[String](value.rev)
+        assert(value.ok)
+      }
+
+      Await.result(result, 5 seconds)
+    }
+
+    it("should get attachment"){
+
+      val result = Document.getAttachment(id, "README.md") map { value =>
+        assert(value.size > 0)
       }
 
       Await.result(result, 5 seconds)
@@ -56,7 +80,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfter{
 
     it("should get revision of document"){
 
-      val result = Document.get[Guy](id, Some(rev)) map { value =>
+      val result = Document.get[Guy](id, Some(revs.head)) map { value =>
         assert(value.age == 23)
         assert(value.name == "Alf")
         assert(value._id.get == id)
@@ -67,7 +91,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfter{
 
     it("should delete document"){
 
-      val result = Document.delete(id, latestRev) map { value =>
+      val result = Document.delete(id, revs.last) map { value =>
         assert(value.ok)
       }
 
