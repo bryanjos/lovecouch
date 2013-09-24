@@ -3,21 +3,20 @@ package com.bryanjos.lovecouch
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Await}
 import ExecutionContext.Implicits.global
-import org.scalatest.{BeforeAndAfter, FunSpec}
-import scala.concurrent.Await
+import org.scalatest._
 import play.api.libs.json.Json
-import java.io.File
+import scala.Some
 
-class DocumentSpec extends FunSpec with BeforeAndAfter{
+class DocumentSpec extends FunSpec with BeforeAndAfterAll{
   implicit val db = Database(name="documentspec")
   case class Guy(_id:Option[String] = None, _rev:Option[String] = None, name:String, age:Long)
   implicit val guyFmt = Json.format[Guy]
   var id = ""
   var revs = List[String]()
 
-  //before{
-  //  Await.result(Database.create(), 5 seconds)
-  //}
+  override def beforeAll() {
+    Await.result(Database.create(), 5 seconds)
+  }
 
   describe("Document"){
     it("should create a document"){
@@ -99,8 +98,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfter{
     }
   }
 
-  //after{
-  //  Await.result(Database.delete(), 5 seconds)
-  //}
-
+  override def afterAll() {
+    Await.result(Database.delete(), 5 seconds)
+  }
 }
