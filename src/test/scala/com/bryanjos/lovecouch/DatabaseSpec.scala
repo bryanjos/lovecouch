@@ -45,7 +45,7 @@ class DatabaseSpec extends FunSpec {
     }
 
     it("should run temp view"){
-      val future = Database.tempView(View(map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }"))
+      val future = Database.tempView(TempView(map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }"))
 
       val result = future map { value =>
         assert((value \ "rows").as[JsArray].value.size == 1)

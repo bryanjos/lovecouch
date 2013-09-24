@@ -13,6 +13,8 @@ case class ViewIndex(compactRunning: Boolean, updaterRunning: Boolean, language:
 case class ViewInfo(name: String, viewIndex: ViewIndex)
 case class ViewRow[T](id: String, key: String, value: Vector[String], doc: Option[T])
 case class ViewResult[T](totalRows: Long, rows: Vector[ViewRow[T]], offset: Long)
+case class View(name:String, map:String, reduce:Option[String] = None)
+case class DesignDocument(_id:String, _rev:Option[String] = None, language:String = "javascript", views:List[View] =())
 
 object DesignDocument {
   implicit val viewIndexReads = (
@@ -33,6 +35,9 @@ object DesignDocument {
       (__ \ "view_index").read[ViewIndex]
     )(ViewInfo.apply _)
 
+  implicit val viewFmt = Json.format[View]
+  implicit val designDocumentFmt = Json.format[DesignDocument]
+
   /**
    * Returns the specified design document
    * @param id
@@ -40,23 +45,48 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def get[T](id: String, rev: Option[String] = None)(implicit database: Database, reads: Reads[T]): Future[T] = {
-    for (res <- Requests.get(database.url + s"/_design/$id",
-      parameters = Map(rev.map {
-        r => "rev" -> r
-      }.orElse(Some("" -> "")).get) - ""))
-    yield Json.fromJson[T](Json.parse(res)).get
+  def get(id: String, rev: Option[String] = None)(implicit database: Database): Future[DesignDocument] = {
+    for (res <- Requests.get(database.url + s"/_design/$id", parameters = Map(rev.map { r => "rev" -> r }.orElse(Some("" -> "")).get) - ""))
+    yield{
+      val json = Json.parse(res)
+
+      DesignDocument(
+        _id = (json \ "_id").as[String],
+        _rev = Some((json \ "_rev").as[String]),
+        language = (json \ "language").as[String],
+        views = (json \ "views").as[JsObject].fields.map{
+          field =>
+            View(
+              name = field._1,
+              map = (field._2 \ "map").as[String],
+              reduce = (field._2 \ "map").asOpt[String]
+            )
+        }.toList
+      )
+    }
   }
 
   /**
    * Upload the specified design document
-   * @param json
-   * @param id
+   * @param designDocument
    * @param database
    * @return
    */
-  def put(json: JsValue, id: String)(implicit database: Database): Future[DocumentResult] = {
-    for (res <- Requests.put(database.url + s"/_design/$id", body = Json.stringify(json),
+  def put(designDocument:DesignDocument)(implicit database: Database): Future[DocumentResult] = {
+    val json = Json.obj(
+      "_id" -> designDocument._id,
+      "language" -> designDocument.language,
+      "views" -> designDocument.views.map
+      {
+        view =>
+          if(view.reduce.isEmpty)
+            view.name -> Json.obj("map" -> view.map)
+          else
+            view.name -> Json.obj("map" -> view.map, "reduce" -> view.reduce.get)
+      }
+    )
+
+    for (res <- Requests.put(database.url + s"/${designDocument._id}", body = Json.stringify(json),
       headers = Map("Content-Type" -> "application/json")))
     yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }

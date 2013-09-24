@@ -26,7 +26,7 @@ case class RowValue(rev:String)
 case class Row(id:String, key:String, value:RowValue)
 case class AllDocsResult(offset:Long, rows:Vector[Row])
 
-case class View(map:String, reduce:Option[String] = None)
+case class TempView(map:String, reduce:Option[String] = None)
 
 object Database {
   implicit val databaseInfoReads = (
@@ -53,7 +53,7 @@ object Database {
     implicit val rowValueFmt = Json.format[RowValue]
     implicit val rowFmt = Json.format[Row]
     implicit val allDocsResultFmt = Json.format[AllDocsResult]
-    implicit val viewFmt = Json.format[View]
+    implicit val viewFmt = Json.format[TempView]
 
   /**
    * Gets information about the specified database.
@@ -171,7 +171,7 @@ object Database {
    * @param database
    * @return
    */
-  def tempView(view:View)(implicit database: Database): Future[JsValue] = {
+  def tempView(view:TempView)(implicit database: Database): Future[JsValue] = {
     for(res <- Requests.post(database.url + "/_temp_view", body=Json.stringify(Json.toJson(view)),
       headers = Map("Content-Type" -> "application/json")))
     yield Json.parse(res)
