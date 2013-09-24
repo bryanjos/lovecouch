@@ -77,8 +77,8 @@ object Document {
    * @param database
    * @return
    */
-  def delete(id:String, rev:Option[String] = None)(implicit database:Database): Future[DocumentResult] = {
-    for(res <- Requests.delete(database.url + s"/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
+  def delete(id:String, rev:String)(implicit database:Database): Future[DocumentResult] = {
+    for(res <- Requests.delete(database.url + s"/$id", parameters = Map("rev"-> rev)))
     yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
@@ -90,8 +90,8 @@ object Document {
    * @param database
    * @return
    */
-  def deleteLocal(id:String, rev:Option[String] = None)(implicit database:Database): Future[DocumentResult] = {
-    for(res <- Requests.delete(database.url + s"/_local/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
+  def deleteLocal(id:String, rev:String)(implicit database:Database): Future[DocumentResult] = {
+    for(res <- Requests.delete(database.url + s"/_local/$id", parameters = Map("rev"-> rev)))
     yield Json.fromJson[DocumentResult](Json.parse(res)).get
   }
 
