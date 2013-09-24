@@ -6,8 +6,8 @@ import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 
 class CouchDbSpec extends FunSpec {
-  describe("Info") {
-    it("couchdb should equal 'Welcome'"){
+  describe("CouchDB") {
+    it("should get info on server and couchdb should equal 'Welcome'"){
 
       val couchDBInfoFuture = CouchDb.info()
 
@@ -18,7 +18,7 @@ class CouchDbSpec extends FunSpec {
       Await.result(result, 5 seconds)
     }
 
-    it("vender.name should equal 'The Apache Software Foundation'"){
+    it("should have vender name equal 'The Apache Software Foundation'"){
 
       val couchDBInfoFuture = CouchDb.info()
       val result = couchDBInfoFuture map { couchDBInfo =>
@@ -27,9 +27,7 @@ class CouchDbSpec extends FunSpec {
 
       Await.result(result, 5 seconds)
     }
-  }
 
-  describe("Active Tasks") {
     it("should have no currently running tasks"){
 
       val future = CouchDb.activeTasks()
@@ -40,9 +38,7 @@ class CouchDbSpec extends FunSpec {
 
       Await.result(result, 5 seconds)
     }
-  }
 
-  describe("All DBs") {
     it("should contain a database named _users"){
 
       val future = CouchDb.allDbs()
@@ -53,14 +49,22 @@ class CouchDbSpec extends FunSpec {
 
       Await.result(result, 5 seconds)
     }
-  }
 
-
-  describe("Stats") {
-    it("should not fail"){
-
+    it("should get stats"){
       val future = CouchDb.stats()
-      val result = future map { value => }
+      val result = future map { value => assert(value != null) }
+      Await.result(result, 5 seconds)
+    }
+
+    it("should get at least one UUID"){
+      val future = CouchDb.uuids()
+      val result = future map { value => assert(value.size > 0) }
+      Await.result(result, 5 seconds)
+    }
+
+    it("should get 3 UUIDs"){
+      val future = CouchDb.uuids(3)
+      val result = future map { value => assert(value.size == 3) }
       Await.result(result, 5 seconds)
     }
   }

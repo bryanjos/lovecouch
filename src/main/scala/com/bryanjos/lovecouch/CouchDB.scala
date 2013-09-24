@@ -201,11 +201,14 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def updates(feed: FeedTypes.FeedTypes = FeedTypes.LongPoll, timeout: Long = 60, heartbeat: Boolean = true,
-                callBack: DatabaseEvent => Unit)
-               (implicit couchDb: CouchDb = CouchDb()): Object with StringsByLine[Unit] = {
+  def updates(callBack: DatabaseEvent => Unit,
+              feed: FeedTypes.FeedTypes = FeedTypes.LongPoll,
+              timeout: Long = 60,
+              heartbeat: Boolean = true)
+              (implicit couchDb: CouchDb = CouchDb()): Object with StringsByLine[Unit] = {
     Requests.getStream(couchDb.url + s"/_db_updates?feed=${feed.toString}&timeout=$timeout&heartbeat=$heartbeat",
-    line => callBack(Json.fromJson[DatabaseEvent](Json.parse(line)).get))
+    line => callBack(Json.fromJson[DatabaseEvent](Json.parse(line)).get)
+    )
   }
 
   /**
@@ -263,7 +266,7 @@ object CouchDb {
    * @return
    */
   def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
-    for(res <- Requests.post(couchDb.url + s"/_uuids?count=$count"))
+    for(res <- Requests.get(couchDb.url + s"/_uuids?count=$count"))
     yield (Json.parse(res) \ "uuids").as[Vector[String]]
   }
 }
