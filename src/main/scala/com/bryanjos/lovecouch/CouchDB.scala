@@ -5,6 +5,7 @@ import ExecutionContext.Implicits.global
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import dispatch.stream.StringsByLine
+import scala.util.Try
 
 case class CouchDb(host: String = "127.0.0.1", port: Int = 5984) {
   def url: String = s"http://$host:$port"
@@ -168,9 +169,9 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def info()(implicit couchDb: CouchDb = CouchDb()): Future[CouchDbInfo] = {
+  def info()(implicit couchDb: CouchDb = CouchDb()): Future[Try[CouchDbInfo]] = {
     for(res <- Requests.get(couchDb.url))
-    yield Json.fromJson[CouchDbInfo](Json.parse(res)).get
+    yield Try(Json.fromJson[CouchDbInfo](Json.parse(res.get)).get)
   }
 
   /**
@@ -178,9 +179,9 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[Vector[ActiveTask]] = {
+  def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[ActiveTask]]] = {
     for(res <- Requests.get(couchDb.url + "/_active_tasks"))
-    yield Json.fromJson[Vector[ActiveTask]](Json.parse(res)).get
+    yield Try(Json.fromJson[Vector[ActiveTask]](Json.parse(res.get)).get)
   }
 
   /**
@@ -188,9 +189,9 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
+  def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[String]]] = {
     for(res <- Requests.get(couchDb.url + "/_all_dbs"))
-    yield Json.parse(res).as[Vector[String]]
+    yield Try(Json.fromJson[Vector[String]](Json.parse(res.get)).get)
   }
 
   /**
@@ -218,9 +219,9 @@ object CouchDb {
    * @param offset
    * @return
    */
-  def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb()): Future[String] = {
+  def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]] = {
     for(res <- Requests.get(couchDb.url + s"/_log?bytes=$bytes&offset=$offset"))
-    yield res
+    yield Try(res.get)
   }
 
   /**
@@ -233,10 +234,10 @@ object CouchDb {
    * @return
    */
   def replicate(bytes: Long = 1000, offset: Long = 0, replicationSpecification: ReplicationSpecification)
-               (implicit couchDb: CouchDb = CouchDb()): Future[ReplicationResponse] = {
+               (implicit couchDb: CouchDb = CouchDb()): Future[Try[ReplicationResponse]] = {
     for(res <- Requests.post(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset",
       body = Json.stringify(Json.toJson(replicationSpecification))))
-    yield Json.fromJson[ReplicationResponse](Json.parse(res)).get
+    yield Try(Json.fromJson[ReplicationResponse](Json.parse(res.get)).get)
   }
 
   /**
@@ -244,9 +245,9 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def restart()(implicit couchDb: CouchDb = CouchDb()): Future[Boolean] = {
+  def restart()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Boolean]] = {
     for(res <- Requests.post(couchDb.url + s"/_restart", headers = Map("Content-Type" -> "application/json")))
-    yield (Json.parse(res) \ "ok").as[Boolean]
+    yield Try((Json.parse(res.get) \ "ok").as[Boolean])
   }
 
   /**
@@ -254,9 +255,9 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def stats()(implicit couchDb: CouchDb = CouchDb()): Future[Stats] = {
+  def stats()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Stats]] = {
     for(res <- Requests.get(couchDb.url + s"/_stats"))
-    yield Json.fromJson[Stats](Json.parse(res)).get
+    yield Try(Json.fromJson[Stats](Json.parse(res.get)).get)
   }
 
   /**
@@ -265,8 +266,8 @@ object CouchDb {
    * @param count
    * @return
    */
-  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[Vector[String]] = {
+  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[String]]] = {
     for(res <- Requests.get(couchDb.url + s"/_uuids?count=$count"))
-    yield (Json.parse(res) \ "uuids").as[Vector[String]]
+    yield Try((Json.parse(res.get) \ "uuids").as[Vector[String]])
   }
 }

@@ -5,11 +5,11 @@ import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import ExecutionContext.Implicits.global
 import Document.documentResultFmt
+import scala.util.Try
 
 
-case class ViewIndex(compactRunning: Boolean, updaterRunning: Boolean, language: String,
-                     purgeSeq: Long, waitingCommit: Boolean,
-                     waitingClients: Long, signature: String, updateSeq: Long, diskSize: Long)
+case class ViewIndex(compactRunning: Boolean, updaterRunning: Boolean, language: String, purgeSeq: Long,
+                     waitingCommit: Boolean, waitingClients: Long, signature: String, updateSeq: Long, diskSize: Long)
 case class ViewInfo(name: String, viewIndex: ViewIndex)
 case class ViewRow(id: String, key: Option[String] = None, value: JsValue)
 case class ViewResult(totalRows: Long, rows: Vector[ViewRow], offset: Long)
@@ -45,24 +45,26 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def get(id: String, rev: Option[String] = None)(implicit database: Database): Future[DesignDocument] = {
+  def get(id: String, rev: Option[String] = None)(implicit database: Database): Future[Try[DesignDocument]] = {
     for (res <- Requests.get(database.url + s"/$id", parameters = Map(rev.map { r => "rev" -> r }.orElse(Some("" -> "")).get) - ""))
     yield{
-      val json = Json.parse(res)
+      Try{
+        val json = Json.parse(res.get)
 
-      DesignDocument(
-        _id = (json \ "_id").as[String],
-        _rev = Some((json \ "_rev").as[String]),
-        language = (json \ "language").as[String],
-        views = (json \ "views").as[JsObject].fields.map{
-          field =>
-            View(
-              name = field._1,
-              map = (field._2 \ "map").as[String],
-              reduce = (field._2 \ "map").asOpt[String]
-            )
-        }.toList
-      )
+        DesignDocument(
+          _id = (json \ "_id").as[String],
+          _rev = Some((json \ "_rev").as[String]),
+          language = (json \ "language").as[String],
+          views = (json \ "views").as[JsObject].fields.map{
+            field =>
+              View(
+                name = field._1,
+                map = (field._2 \ "map").as[String],
+                reduce = (field._2 \ "map").asOpt[String]
+              )
+          }.toList
+        )
+      }
     }
   }
 
@@ -72,7 +74,7 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def put(designDocument:DesignDocument)(implicit database: Database): Future[DocumentResult] = {
+  def put(designDocument:DesignDocument)(implicit database: Database): Future[Try[DocumentResult]] = {
     val json = Json.obj(
       "_id" -> designDocument._id,
       "language" -> designDocument.language,
@@ -88,7 +90,7 @@ object DesignDocument {
 
     for (res <- Requests.put(database.url + s"/${designDocument._id}", body = Json.stringify(json),
       headers = Map("Content-Type" -> "application/json")))
-    yield Json.fromJson[DocumentResult](Json.parse(res)).get
+    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
   }
 
   /**
@@ -98,11 +100,11 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def delete(id: String, rev: String)(implicit database: Database): Future[DocumentResult] = {
+  def delete(id: String, rev: String)(implicit database: Database): Future[Try[DocumentResult]] = {
     for (res <- Requests.delete(database.url + s"/$id",
       parameters = Map("rev"-> rev),
       headers = Map("Content-Type" -> "application/json")))
-    yield Json.fromJson[DocumentResult](Json.parse(res)).get
+    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
   }
 
 
@@ -113,7 +115,7 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def getAttachment(id: String, attachmentName: String)(implicit database: Database): Future[Array[Byte]] = {
+  def getAttachment(id: String, attachmentName: String)(implicit database: Database): Future[Try[Array[Byte]]] = {
     Requests.getBytes(database.url + s"/$id/$attachmentName")
   }
 
@@ -129,11 +131,11 @@ object DesignDocument {
    * @return
    */
   def putAttachment(id: String, rev: String, attachmentName: String, attachment: java.io.File, mimeType: String)
-                   (implicit database: Database): Future[DocumentResult] = {
+                   (implicit database: Database): Future[Try[DocumentResult]] = {
     for (res <- Requests.putFile(database.url + s"$id/$attachmentName", file = attachment,
       parameters = Map("rev" -> rev),
       headers = Map() + ("Content-Length" -> attachment.length().toString) + ("Mime-Type" -> mimeType)))
-    yield Json.fromJson[DocumentResult](Json.parse(res)).get
+    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
   }
 
   /**
@@ -144,9 +146,9 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def deleteAttachment(id: String, rev: String, attachmentName: String)(implicit database: Database): Future[DocumentResult] = {
+  def deleteAttachment(id: String, rev: String, attachmentName: String)(implicit database: Database): Future[Try[DocumentResult]] = {
     for (res <- Requests.delete(database.url + s"/$id/$attachmentName", parameters = Map("rev" -> rev)))
-    yield Json.fromJson[DocumentResult](Json.parse(res)).get
+    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
   }
 
 
@@ -156,9 +158,9 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def info(id: String)(implicit database: Database): Future[ViewInfo] = {
+  def info(id: String)(implicit database: Database): Future[Try[ViewInfo]] = {
     for (res <- Requests.put(database.url + s"/$id/_info", headers = Map("Content-Type" -> "application/json")))
-    yield Json.fromJson[ViewInfo](Json.parse(res)).get
+    yield Try(Json.fromJson[ViewInfo](Json.parse(res.get)).get)
   }
 
 
@@ -178,7 +180,7 @@ object DesignDocument {
                      startKey: Option[String] = None,
                      startKeyDocId: Option[String] = None,
                      updateSeq: Option[Boolean] = None)
-                    (implicit database: Database): Future[ViewResult] = {
+                    (implicit database: Database): Future[Try[ViewResult]] = {
 
     val map = Map[String, String]() +
       descending.map {
@@ -230,20 +232,22 @@ object DesignDocument {
 
     for (res <- Requests.get(database.url + s"/$designDocName/_view/$viewName", parameters = map))
     yield {
-      val json = Json.parse(res)
+      Try{
+        val json = Json.parse(res.get)
 
-      ViewResult(
-        (json \ "total_rows").as[Long],
-        (json \ "rows").as[List[JsObject]].map {
-          row =>
-            ViewRow(
-              (row \ "id").as[String],
-              (row \ "key").asOpt[String],
-              (row \ "value").as[JsValue]
-            )
-        }.toVector,
-        (json \ "offset").as[Long]
-      )
+        ViewResult(
+          (json \ "total_rows").as[Long],
+          (json \ "rows").as[List[JsObject]].map {
+            row =>
+              ViewRow(
+                (row \ "id").as[String],
+                (row \ "key").asOpt[String],
+                (row \ "value").as[JsValue]
+              )
+          }.toVector,
+          (json \ "offset").as[Long]
+        )
+      }
     }
   }
 
@@ -265,7 +269,7 @@ object DesignDocument {
                          startKey: Option[String] = None,
                          startKeyDocId: Option[String] = None,
                          updateSeq: Option[Boolean] = None)
-                        (implicit database: Database): Future[ViewResult] = {
+                        (implicit database: Database): Future[Try[ViewResult]] = {
 
 
     val map = Map[String, String]() +
@@ -322,20 +326,22 @@ object DesignDocument {
       headers = Map("Content-Type" -> "application/json")
     ))
     yield {
-      val json = Json.parse(res)
+      Try{
+        val json = Json.parse(res.get)
 
-      ViewResult(
-        (json \ "total_rows").as[Long],
-        (json \ "rows").as[List[JsObject]].map {
-          row =>
-            ViewRow(
-              (row \ "id").as[String],
-              (row \ "key").asOpt[String],
-              (row \ "value").as[JsValue]
-            )
-        }.toVector,
-        (json \ "offset").as[Long]
-      )
+        ViewResult(
+          (json \ "total_rows").as[Long],
+          (json \ "rows").as[List[JsObject]].map {
+            row =>
+              ViewRow(
+                (row \ "id").as[String],
+                (row \ "key").asOpt[String],
+                (row \ "value").as[JsValue]
+              )
+          }.toVector,
+          (json \ "offset").as[Long]
+        )
+      }
     }
   }
 

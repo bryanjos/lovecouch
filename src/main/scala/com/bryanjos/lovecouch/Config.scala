@@ -3,6 +3,7 @@ package com.bryanjos.lovecouch
 import scala.concurrent._
 import play.api.libs.json._
 import ExecutionContext.Implicits.global
+import scala.util.Try
 
 object Config {
 
@@ -12,9 +13,9 @@ object Config {
    * @param couchDb
    * @return
    */
-  def get()(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
+  def get()(implicit couchDb: CouchDb = CouchDb()): Future[Try[JsValue]] = {
     for(res <- Requests.get(couchDb.url + s"/_config"))
-    yield Json.parse(res)
+    yield Try(Json.parse(res.get))
   }
 
   /**
@@ -23,9 +24,9 @@ object Config {
    * @param couchDb
    * @return
    */
-  def getSection(section:String)(implicit couchDb: CouchDb = CouchDb()): Future[JsValue] = {
+  def getSection(section:String)(implicit couchDb: CouchDb = CouchDb()): Future[Try[JsValue]] = {
     for(res <- Requests.get(couchDb.url + s"/_config/$section"))
-    yield Json.parse(res)
+    yield Try(Json.parse(res.get))
   }
 
   /**
@@ -35,9 +36,9 @@ object Config {
    * @param couchDb
    * @return
    */
-  def getSectionKey(section:String, key:String)(implicit couchDb: CouchDb = CouchDb()): Future[String] = {
+  def getSectionKey(section:String, key:String)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]] = {
     for(res <- Requests.get(couchDb.url + s"/_config/$section/$key"))
-    yield res
+    yield Try(res.get)
   }
 
   /**
@@ -48,9 +49,9 @@ object Config {
    * @param couchDb
    * @return
    */
-  def putSectionKey(section:String, key:String, value:String)(implicit couchDb: CouchDb = CouchDb()): Future[String] = {
+  def putSectionKey(section:String, key:String, value:String)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]] = {
     for(res <- Requests.put(couchDb.url + s"/_config/$section/$key", body = value))
-    yield res
+    yield Try(res.get)
   }
 
   /**
@@ -60,9 +61,9 @@ object Config {
    * @param couchDb
    * @return
    */
-  def deleteSectionKey(section:String, key:String)(implicit couchDb: CouchDb = CouchDb()): Future[String] = {
+  def deleteSectionKey(section:String, key:String)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]] = {
     for(res <- Requests.delete(couchDb.url + s"/_config/$section/$key"))
-    yield res
+    yield Try(res.get)
   }
 
 }

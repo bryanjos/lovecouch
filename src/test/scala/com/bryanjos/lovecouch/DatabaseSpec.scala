@@ -11,61 +11,82 @@ class DatabaseSpec extends FunSpec {
   case class Guy(_id:Option[String] = None, _rev:Option[String] = None, name:String, age:Long)
   implicit val guyFmt = Json.format[Guy]
 
-  describe("Database") {
+  info("CouchDB Database Methods")
 
-    it("should create new database named test"){
-      val future = Database.create()
-
-      val result = future map { value =>
-        assert(value)
+  describe("Create a new database") {
+    val result = Database.create() map { value =>
+      it("should be a successful request"){
+        assert(value.isSuccess)
       }
 
-      Await.result(result, 5 seconds)
+      it("should be created"){
+        assert(value.get)
+      }
     }
 
-    it("should get info on test database"){
-      val future = Database.info()
+    Await.result(result, 5 seconds)
+  }
 
-      val result = future map { value =>
-        assert(value.dbName == "test")
+  describe("Returns database information") {
+    val result = Database.info() map { value =>
+      it("should be a successful request"){
+        assert(value.isSuccess)
       }
 
-      Await.result(result, 5 seconds)
+      it("should be named test"){
+        assert(value.get.dbName == "test")
+      }
     }
 
-    it("should import mulitple objects"){
-      val future = Database.bulkDocs(Seq[Guy](Guy(name="Alf", age=23), Guy(name="SuperAlf", age=46)))
+    Await.result(result, 5 seconds)
+  }
 
-      val result = future map { value =>
-        assert(value.isInstanceOf[JsArray])
-        assert(value.as[JsArray].value.size == 2)
+  describe("Insert multiple documents in to the database in a single request") {
+    val result = Database.bulkDocs(Seq[Guy](Guy(name="Alf", age=23), Guy(name="SuperAlf", age=46))) map { value =>
+      it("should be a successful request"){
+        assert(value.isSuccess)
       }
 
-      Await.result(result, 5 seconds)
-    }
-
-    it("should run temp view"){
-      val future = Database.tempView(TempView(map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }"))
-
-      val result = future map { value =>
-        assert((value \ "rows").as[JsArray].value.size == 1)
-        assert(((value \ "rows").as[JsArray].value.head \ "value").as[Long] == 46)
+      it("should be a Json Array"){
+        assert(value.get.isInstanceOf[JsArray])
       }
 
-      Await.result(result, 5 seconds)
+      it("should have 2 elements"){
+        assert(value.get.as[JsArray].value.size == 2)
+      }
     }
 
-    it("should delete test database"){
-      Await.result(Database.delete(), 5 seconds)
+    Await.result(result, 5 seconds)
+  }
 
-      val future = CouchDb.allDbs()
-
-      val result = future map { value =>
-        assert(!value.contains("test"))
+  describe("Execute a given view function for all documents and return the result") {
+    val result = Database.tempView(TempView(map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }")) map { value =>
+      it("should be a successful request"){
+        assert(value.isSuccess)
       }
 
-      Await.result(result, 5 seconds)
+      it("should have one element"){
+        assert((value.get \ "rows").as[JsArray].value.size == 1)
+      }
+
+      it("should have a value of 46"){
+        assert(((value.get \ "rows").as[JsArray].value.head \ "value").as[Long] == 46)
+      }
     }
+
+    Await.result(result, 5 seconds)
+  }
+
+  describe("Delete an existing database") {
+    Await.result(Database.delete(), 5 seconds)
+
+    val result = CouchDb.allDbs() map { value =>
+      it("should not contain a database named test"){
+        assert(!value.get.contains("test"))
+      }
+    }
+
+    Await.result(result, 5 seconds)
   }
 
 }

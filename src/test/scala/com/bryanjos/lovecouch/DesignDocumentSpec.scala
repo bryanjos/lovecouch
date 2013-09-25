@@ -23,9 +23,9 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll{
   describe("Design Document"){
     it("should put"){
       val result = DesignDocument.put(dd) map { value =>
-        id = value.id
-        revs = revs ++ List[String](value.rev)
-        assert(value.ok)
+        id = value.get.id
+        revs = revs ++ List[String](value.get.rev)
+        assert(value.get.ok)
       }
 
       Await.result(result, 5 seconds)
@@ -33,9 +33,10 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll{
 
     it("should get"){
       val result = DesignDocument.get(id) map { value =>
-        assert(value._id == id)
-        assert(value._rev.get == revs.head)
-        assert(value.views.head.name == "by_age")
+        assert(value.isSuccess)
+        assert(value.get._id == id)
+        assert(value.get._rev.get == revs.head)
+        assert(value.get.views.head.name == "by_age")
       }
 
       Await.result(result, 5 seconds)
@@ -43,8 +44,9 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll{
 
     it("should execute"){
       Await.result(Database.bulkDocs(Seq[Guy](Guy(name="Alf", age=23), Guy(name="SuperAlf", age=46))), 5 seconds)
-      val result = DesignDocument.executeView[Guy]("_design/ages", "by_age") map { value =>
-        assert(value.rows.size == 1)
+      val result = DesignDocument.executeView("_design/ages", "by_age") map { value =>
+        assert(value.isSuccess)
+        assert(value.get.rows.size == 1)
       }
 
       Await.result(result, 5 seconds)
@@ -52,7 +54,7 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll{
 
     it("should delete"){
       val result = DesignDocument.delete(id, revs.head) map { value =>
-        assert(value.ok)
+        assert(value.get.ok)
       }
 
       Await.result(result, 5 seconds)

@@ -21,3 +21,4 @@ libraryDependencies ++= Seq(
 
 initialCommands := "import com.bryanjos.lovecouch._"
 
+testOptions in Test += Tests.Argument("-oD")
