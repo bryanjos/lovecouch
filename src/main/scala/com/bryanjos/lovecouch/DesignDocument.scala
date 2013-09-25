@@ -74,7 +74,7 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def put(designDocument:DesignDocument)(implicit database: Database): Future[Try[DocumentResult]] = {
+  def addOrUpdate(designDocument:DesignDocument)(implicit database: Database): Future[Try[DocumentResult]] = {
     val json = Json.obj(
       "_id" -> designDocument._id,
       "language" -> designDocument.language,
@@ -130,7 +130,7 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def putAttachment(id: String, rev: String, attachmentName: String, attachment: java.io.File, mimeType: String)
+  def addAttachment(id: String, rev: String, attachmentName: String, attachment: java.io.File, mimeType: String)
                    (implicit database: Database): Future[Try[DocumentResult]] = {
     for (res <- Requests.putFile(database.url + s"$id/$attachmentName", file = attachment,
       parameters = Map("rev" -> rev),
@@ -164,6 +164,28 @@ object DesignDocument {
   }
 
 
+  /**
+   * Executes the specified view-name from the specified design-doc design document.
+   * @param designDocName
+   * @param viewName
+   * @param descending
+   * @param endKey
+   * @param endKeyDocId
+   * @param group
+   * @param groupLevel
+   * @param includeDocs
+   * @param inclusiveEnd
+   * @param key
+   * @param limit
+   * @param reduce
+   * @param skip
+   * @param stale
+   * @param startKey
+   * @param startKeyDocId
+   * @param updateSeq
+   * @param database
+   * @return
+   */
   def executeView(designDocName: String, viewName: String,
                      descending: Option[Boolean] = None,
                      endKey: Option[String] = None,
@@ -251,6 +273,31 @@ object DesignDocument {
     }
   }
 
+  /**
+   * Executes the specified view-name from the specified design-doc design document.
+   * Unlike the GET method for accessing views, the POST method supports the specification
+   * of explicit keys to be retrieved from the view results.
+   * @param designDocName
+   * @param viewName
+   * @param keys
+   * @param descending
+   * @param endKey
+   * @param endKeyDocId
+   * @param group
+   * @param groupLevel
+   * @param includeDocs
+   * @param inclusiveEnd
+   * @param key
+   * @param limit
+   * @param reduce
+   * @param skip
+   * @param stale
+   * @param startKey
+   * @param startKeyDocId
+   * @param updateSeq
+   * @param database
+   * @return
+   */
   def executeViewPost(designDocName: String,
                          viewName: String,
                          keys: Vector[String],

@@ -17,7 +17,7 @@ object Document {
    * @param database
    * @return
    */
-  def post[T](doc:T)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
+  def create[T](doc:T)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
     for(res <- Requests.post(database.url, body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
     yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
   }
@@ -53,7 +53,7 @@ object Document {
    * @param database
    * @return
    */
-  def put[T](doc:T, id:String)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
+  def updateOrCreate[T](doc:T, id:String)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
     for(res <- Requests.put(database.url + s"/$id", body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
     yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
   }
@@ -65,7 +65,7 @@ object Document {
    * @param database
    * @return
    */
-  def putLocal[T](doc:T, id:String)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
+  def updateOrCreateLocal[T](doc:T, id:String)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
     for(res <- Requests.put(database.url  + s"/_local/$id", body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
     yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
   }
@@ -117,7 +117,7 @@ object Document {
    * @param database
    * @return
    */
-  def putAttachment(id:String, rev:String, attachmentName:String, attachment:java.io.File, mimeType:String)(implicit database:Database): Future[Try[DocumentResult]] = {
+  def addAttachment(id:String, rev:String, attachmentName:String, attachment:java.io.File, mimeType:String)(implicit database:Database): Future[Try[DocumentResult]] = {
     for(res <- Requests.putFile(database.url + s"/$id/$attachmentName", file=attachment,
       parameters = Map("rev"-> rev),
       headers = Map() + ("Content-Length" -> attachment.length().toString) + ("Mime-Type" -> mimeType)))

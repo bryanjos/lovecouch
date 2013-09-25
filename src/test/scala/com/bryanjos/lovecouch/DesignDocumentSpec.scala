@@ -26,7 +26,7 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Upload the specified design document") {
     it("should be ok") {
-      val result = DesignDocument.put(dd) map {
+      val result = DesignDocument.addOrUpdate(dd) map {
         value =>
           assert(value.isSuccess)
           id = value.get.id

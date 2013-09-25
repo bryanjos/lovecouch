@@ -24,7 +24,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
   describe("Create a new document") {
     it("should be created") {
       val data = Guy(name = "Alf", age = 23)
-      val result = Document.post[Guy](data) map {
+      val result = Document.create[Guy](data) map {
         value =>
           assert(value.isSuccess)
           id = value.get.id
@@ -56,7 +56,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be updated") {
       val data = Guy(_id = Some(id), _rev = Some(revs.last), name = "Alf", age = 24)
 
-      val result = Document.put[Guy](data, id) map {
+      val result = Document.updateOrCreate[Guy](data, id) map {
         value =>
           assert(value.isSuccess)
           revs = revs ++ List[String](value.get.rev)
@@ -71,7 +71,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Adds an attachment of a document") {
     it("should be added") {
-      val result = Document.putAttachment(id,
+      val result = Document.addAttachment(id,
         revs.last,
         "README.md",
         new java.io.File("/Users/bryanjos/Projects/Personal/lovecouch/README.md"),
