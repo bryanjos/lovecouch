@@ -18,7 +18,7 @@ import com.bryanjos.lovecouch._
 ```
 
 
-### CouchDB object methods
+### CouchDB object methods (Miscellaneous Methods from CouchDB API)
 
 
 #### def info()(implicit couchDb: CouchDb = CouchDb()): Future[Try[CouchDbInfo]]
