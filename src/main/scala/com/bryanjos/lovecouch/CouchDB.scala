@@ -233,7 +233,7 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def replicate(bytes: Long = 1000, offset: Long = 0, replicationSpecification: ReplicationSpecification)
+  def replicate(replicationSpecification: ReplicationSpecification, bytes: Long = 1000, offset: Long = 0)
                (implicit couchDb: CouchDb = CouchDb()): Future[Try[ReplicationResponse]] = {
     for(res <- Requests.post(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset",
       body = Json.stringify(Json.toJson(replicationSpecification))))
@@ -251,7 +251,7 @@ object CouchDb {
   }
 
   /**
-   * Returns a JSON object containing the statistics for the running server
+   * Returns statistics for the running server
    * @param couchDb
    * @return
    */
