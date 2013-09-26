@@ -7,8 +7,7 @@ version := "0.1.0-SNAPSHOT"
 scalaVersion := "2.10.2"
 
 resolvers ++= Seq(
-"spray" at "http://repo.spray.io/",
-"Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases/"
+    "Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases/"
 )
 
 libraryDependencies ++= Seq(
