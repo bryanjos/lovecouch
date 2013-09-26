@@ -18,7 +18,7 @@ import com.bryanjos.lovecouch._
 ```
 
 
-### CouchDB object methods (Miscellaneous Methods from CouchDB API)
+### CouchDB functions
 
 
 #### def info()(implicit couchDb: CouchDb = CouchDb()): Future[Try[CouchDbInfo]]
@@ -77,6 +77,40 @@ val stats = CouchDB.stats()
 ##### Requests one or more Universally Unique Identifiers (UUIDs) from the CouchDB instance
 ```scala
 val uuids = CouchDB.uuids()
+```
+
+
+### Config functions
+
+#### def get()(implicit couchDb: CouchDb = CouchDb()): Future[Try[JsValue]]
+##### Returns the entire CouchDB server configuration as a JSON structure.
+```scala
+val config = Config.get()
+```
+
+#### getSection(section:String)(implicit couchDb: CouchDb = CouchDb()): Future[Try[JsValue]]
+##### Gets the configuration structure for a single section.
+```scala
+val section = Config.getSection("section_name")
+```
+
+#### getSectionKey(section:String, key:String)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]]
+##### Gets a single configuration value from within a specific configuration section.
+```scala
+val sectionKey = Config.getSectionKey("section_name", "section_key")
+```
+
+#### putSectionKey(section:String, key:String, value:String)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]]
+##### Updates a configuration value.
+```scala
+val sectionKeyResponse = Config.putSectionKey("section_name", "section_key", "section_value")
+```
+
+
+#### deleteSectionKey(section:String, key:String)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]]
+##### Deletes a configuration value.
+```scala
+val sectionKeyResponse = Config.deleteSectionKey("section_name")
 ```
 
 
