@@ -9,6 +9,7 @@ Currently uses the Play2 Json Library for Json parsing. Currently using Dispatch
 
 All methods will return a Future[U] where U is whatever object is wanted whenever everything is done.
 
+If an error occurs, than a CouchDBException will be thrown
 
 When the spray integration is completed, you will have to make an implicit ActorSystem to use it
 
