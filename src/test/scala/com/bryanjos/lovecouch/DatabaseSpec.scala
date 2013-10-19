@@ -17,12 +17,8 @@ class DatabaseSpec extends FunSpec {
 
   describe("Create a new database") {
     val result = Database.create() map { value =>
-      it("should be a successful request"){
-        assert(value.isSuccess)
-      }
-
       it("should be created"){
-        assert(value.get)
+        assert(value)
       }
     }
 
@@ -31,12 +27,8 @@ class DatabaseSpec extends FunSpec {
 
   describe("Returns database information") {
     val result = Database.info() map { value =>
-      it("should be a successful request"){
-        assert(value.isSuccess)
-      }
-
       it("should be named test"){
-        assert(value.get.dbName == "test")
+        assert(value.dbName == "test")
       }
     }
 
@@ -45,16 +37,12 @@ class DatabaseSpec extends FunSpec {
 
   describe("Insert multiple documents in to the database in a single request") {
     val result = Database.bulkDocs(Seq[Guy](Guy(name="Alf", age=23), Guy(name="SuperAlf", age=46))) map { value =>
-      it("should be a successful request"){
-        assert(value.isSuccess)
-      }
-
       it("should be a Json Array"){
-        assert(value.get.isInstanceOf[JsArray])
+        assert(value.isInstanceOf[JsArray])
       }
 
       it("should have 2 elements"){
-        assert(value.get.as[JsArray].value.size == 2)
+        assert(value.as[JsArray].value.size == 2)
       }
     }
 
@@ -63,16 +51,13 @@ class DatabaseSpec extends FunSpec {
 
   describe("Execute a given view function for all documents and return the result") {
     val result = Database.tempView(TempView(map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }")) map { value =>
-      it("should be a successful request"){
-        assert(value.isSuccess)
-      }
 
       it("should have one element"){
-        assert((value.get \ "rows").as[JsArray].value.size == 1)
+        assert((value \ "rows").as[JsArray].value.size == 1)
       }
 
       it("should have a value of 46"){
-        assert(((value.get \ "rows").as[JsArray].value.head \ "value").as[Long] == 46)
+        assert(((value \ "rows").as[JsArray].value.head \ "value").as[Long] == 46)
       }
     }
 

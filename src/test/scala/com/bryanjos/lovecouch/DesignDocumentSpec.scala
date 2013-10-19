@@ -6,8 +6,10 @@ import org.scalatest.{BeforeAndAfterAll, FunSpec}
 import scala.concurrent.Await
 import ExecutionContext.Implicits.global
 import play.api.libs.json.Json
+import akka.actor.ActorSystem
 
 class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
+  implicit val system = ActorSystem()
   implicit val db = Database(name = "designdocumentspec")
   var id = ""
   var revs = List[String]()
@@ -28,10 +30,10 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be ok") {
       val result = DesignDocument.addOrUpdate(dd) map {
         value =>
-          assert(value.isSuccess)
-          id = value.get.id
-          revs = revs ++ List[String](value.get.rev)
-          assert(value.get.ok)
+
+          id = value.id
+          revs = revs ++ List[String](value.rev)
+          assert(value.ok)
       }
 
       Await.result(result, 5 seconds)
@@ -42,10 +44,10 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should return the design document") {
       val result = DesignDocument.get(id) map {
         value =>
-          assert(value.isSuccess)
-          assert(value.get._id == id)
-          assert(value.get._rev.get == revs.head)
-          assert(value.get.views.head.name == "by_age")
+
+          assert(value._id == id)
+          assert(value._rev.get == revs.head)
+          assert(value.views.head.name == "by_age")
       }
 
       Await.result(result, 5 seconds)
@@ -59,8 +61,8 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
       Await.result(Database.bulkDocs(Seq[Guy](Guy(name = "Alf", age = 23), Guy(name = "SuperAlf", age = 46))), 5 seconds)
       val result = DesignDocument.executeView("_design/ages", "by_age") map {
         value =>
-          assert(value.isSuccess)
-          assert(value.get.rows.size == 1)
+
+          assert(value.rows.size == 1)
       }
 
       Await.result(result, 5 seconds)
@@ -71,8 +73,8 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be deleted successfully") {
       val result = DesignDocument.delete(id, revs.head) map {
         value =>
-          assert(value.isSuccess)
-          assert(value.get.ok)
+
+          assert(value.ok)
       }
       Await.result(result, 5 seconds)
     }

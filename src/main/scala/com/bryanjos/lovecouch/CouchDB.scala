@@ -1,7 +1,6 @@
 package com.bryanjos.lovecouch
 
 import scala.concurrent._
-import ExecutionContext.Implicits.global
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import akka.actor.ActorSystem
@@ -172,10 +171,10 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def info()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[CouchDbInfo] = {
-    SprayRequests.get(couchDb.url).map{
+  def info()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem, context:ExecutionContext): Future[CouchDbInfo] = {
+    Requests.get(couchDb.url).map{
       response =>
-        SprayRequests.processJsonResponse[CouchDbInfo](response)
+        Requests.processObjectResponse[CouchDbInfo](response)
     }
   }
 
@@ -184,10 +183,10 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def activeTasks()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[ActiveTask]] = {
-    SprayRequests.get(couchDb.url + "/_active_tasks").map{
+  def activeTasks()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem, context:ExecutionContext): Future[Vector[ActiveTask]] = {
+    Requests.get(couchDb.url + "/_active_tasks").map{
       response =>
-        SprayRequests.processJsonResponse[Vector[ActiveTask]](response)
+        Requests.processObjectResponse[Vector[ActiveTask]](response)
     }
   }
 
@@ -196,10 +195,10 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def allDbs()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[String]] = {
-    SprayRequests.get(couchDb.url + "/_all_dbs").map{
+  def allDbs()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem, context:ExecutionContext): Future[Vector[String]] = {
+    Requests.get(couchDb.url + "/_all_dbs").map{
       response =>
-        SprayRequests.processJsonResponse[Vector[String]](response)
+        Requests.processObjectResponse[Vector[String]](response)
     }
   }
 
@@ -210,10 +209,10 @@ object CouchDb {
    * @param offset
    * @return
    */
-  def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[String] = {
-    SprayRequests.get(couchDb.url + s"/_log?bytes=$bytes&offset=$offset").map{
+  def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem, context:ExecutionContext): Future[String] = {
+    Requests.get(couchDb.url + s"/_log?bytes=$bytes&offset=$offset").map{
       response =>
-        SprayRequests.processStringResponse(response)
+        Requests.processStringResponse(response)
     }
   }
 
@@ -227,13 +226,13 @@ object CouchDb {
    * @return
    */
   def replicate(replicationSpecification: ReplicationSpecification, bytes: Long = 1000, offset: Long = 0)
-               (implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[ReplicationResponse] = {
+               (implicit couchDb: CouchDb = CouchDb(), system:ActorSystem, context:ExecutionContext): Future[ReplicationResponse] = {
 
 
-    SprayRequests.post(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset",
+    Requests.post(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset",
       body = Json.stringify(Json.toJson(replicationSpecification))).map{
       response =>
-        SprayRequests.processJsonResponse[ReplicationResponse](response)
+        Requests.processObjectResponse[ReplicationResponse](response)
     }
   }
 
@@ -242,10 +241,10 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def restart()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Boolean] = {
-    SprayRequests.post(couchDb.url + s"/_restart", headers = Map("Content-Type" -> "application/json")).map{
+  def restart()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem, context:ExecutionContext): Future[Boolean] = {
+    Requests.post(couchDb.url + s"/_restart").map{
       response =>
-        SprayRequests.processBooleanResponse(response)
+        Requests.processBooleanResponse(response)
     }
   }
 
@@ -254,10 +253,10 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def stats()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Stats] = {
-    SprayRequests.get(couchDb.url + "/_stats").map{
+  def stats()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem, context:ExecutionContext): Future[Stats] = {
+    Requests.get(couchDb.url + "/_stats").map{
       response =>
-        SprayRequests.processJsonResponse[Stats](response)
+        Requests.processObjectResponse[Stats](response)
     }
   }
 
@@ -267,10 +266,10 @@ object CouchDb {
    * @param count
    * @return
    */
-  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[String]] = {
-    SprayRequests.get(couchDb.url + s"/_uuids?count=$count").map{
+  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem, context:ExecutionContext): Future[Vector[String]] = {
+    Requests.get(couchDb.url + s"/_uuids?count=$count").map{
       response =>
-        SprayRequests.processResponse[Vector[String]](response,
+        Requests.processResponse[Vector[String]](response,
           (e:HttpEntity) => (Json.parse(e.asString) \ "uuids").as[Vector[String]])
     }
   }

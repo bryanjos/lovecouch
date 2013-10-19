@@ -8,13 +8,11 @@ scalaVersion := "2.10.2"
 
 resolvers ++= Seq(
     "Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases/",
-    "spray repo" at "http://repo.spray.io",
     "spray nightly repo" at "http://nightlies.spray.io"
 )
 
 libraryDependencies ++= Seq(
 	"org.scalatest" % "scalatest_2.10" % "2.0.RC1-SNAP4",
-	"net.databinder.dispatch" %% "dispatch-core" % "0.11.0",
 	"com.typesafe.play" % "play-json_2.10" % "2.2.0-M1",
 	"com.typesafe.akka" %% "akka-actor" % "2.2.1",
 	"io.spray" % "spray-client" % "1.2-20131011"

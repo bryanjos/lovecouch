@@ -5,8 +5,10 @@ import scala.concurrent.{ExecutionContext, Await}
 import ExecutionContext.Implicits.global
 import org.scalatest._
 import play.api.libs.json.Json
+import akka.actor.ActorSystem
 
 class DocumentSpec extends FunSpec with BeforeAndAfterAll {
+  implicit val system = ActorSystem()
   implicit val db = Database(name = "documentspec")
 
   case class Guy(_id: Option[String] = None, _rev: Option[String] = None, name: String, age: Long)
@@ -26,10 +28,9 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
       val data = Guy(name = "Alf", age = 23)
       val result = Document.create[Guy](data) map {
         value =>
-          assert(value.isSuccess)
-          id = value.get.id
-          revs = revs ++ List[String](value.get.rev)
-          assert(value.get.ok)
+          id = value.id
+          revs = revs ++ List[String](value.rev)
+          assert(value.ok)
       }
       Await.result(result, 5 seconds)
     }
@@ -40,10 +41,9 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be return the wanted document") {
       val result = Document.get[Guy](id) map {
         value =>
-          assert(value.isSuccess)
-          assert(value.get.age == 23)
-          assert(value.get.name == "Alf")
-          assert(value.get._id.get == id)
+          assert(value.age == 23)
+          assert(value.name == "Alf")
+          assert(value._id.get == id)
       }
       Await.result(result, 5 seconds)
     }
@@ -58,9 +58,8 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
 
       val result = Document.updateOrCreate[Guy](data, id) map {
         value =>
-          assert(value.isSuccess)
-          revs = revs ++ List[String](value.get.rev)
-          assert(value.get.ok)
+          revs = revs ++ List[String](value.rev)
+          assert(value.ok)
       }
       Await.result(result, 5 seconds)
     }
@@ -77,9 +76,8 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
         new java.io.File("/Users/bryanjos/Projects/Personal/lovecouch/README.md"),
         "text/plain") map {
         value =>
-          assert(value.isSuccess)
-          revs = revs ++ List[String](value.get.rev)
-          assert(value.get.ok)
+          revs = revs ++ List[String](value.rev)
+          assert(value.ok)
       }
       Await.result(result, 5 seconds)
     }
@@ -90,8 +88,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be a byte array with non zero bytes") {
       val result = Document.getAttachment(id, "README.md") map {
         value =>
-          assert(value.isSuccess)
-          assert(!value.get.isEmpty)
+          assert(!value.isEmpty)
       }
 
       Await.result(result, 5 seconds)
@@ -105,12 +102,9 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be a previous revision of the document") {
       val result = Document.get[Guy](id, Some(revs.head)) map {
         value =>
-          assert(value.isSuccess)
-
-
-          assert(value.get.age == 23)
-          assert(value.get.name == "Alf")
-          assert(value.get._id.get == id)
+          assert(value.age == 23)
+          assert(value.name == "Alf")
+          assert(value._id.get == id)
       }
 
       Await.result(result, 5 seconds)
@@ -124,8 +118,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be deleted") {
       val result = Document.delete(id, revs.last) map {
         value =>
-          assert(value.isSuccess)
-          assert(value.get.ok)
+          assert(value.ok)
       }
 
       Await.result(result, 5 seconds)

@@ -1,9 +1,8 @@
 package com.bryanjos.lovecouch
 
 import scala.concurrent._
-import ExecutionContext.Implicits.global
 import play.api.libs.json._
-import scala.util.Try
+import akka.actor.ActorSystem
 
 case class DocumentResult(ok:Boolean, id:String, rev:String)
 
@@ -17,9 +16,12 @@ object Document {
    * @param database
    * @return
    */
-  def create[T](doc:T)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
-    for(res <- Requests.post(database.url, body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
-    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
+  def create[T](doc:T)
+               (implicit database:Database, system:ActorSystem, context:ExecutionContext, writes: Writes[T]): Future[DocumentResult] = {
+    Requests.post(database.url, body = Json.stringify(Json.toJson[T](doc))).map{
+      response =>
+        Requests.processObjectResponse[DocumentResult](response)
+    }
   }
 
   /**
@@ -29,9 +31,12 @@ object Document {
    * @param database
    * @return
    */
-  def get[T](id:String, rev:Option[String] = None)(implicit database:Database, reads: Reads[T]): Future[Try[T]] = {
-    for(res <- Requests.get(database.url + s"/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
-    yield Try(Json.fromJson[T](Json.parse(res.get)).get)
+  def get[T](id:String, rev:Option[String] = None)
+            (implicit database:Database, system:ActorSystem, context:ExecutionContext, reads: Reads[T]): Future[T] = {
+    Requests.get(database.url + s"/$id", queryParameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - "").map{
+      response =>
+        Requests.processObjectResponse[T](response)
+    }
   }
 
   /**
@@ -41,9 +46,12 @@ object Document {
    * @param database
    * @return
    */
-  def getLocal[T](id:String, rev:Option[String] = None)(implicit database:Database, reads: Reads[T]): Future[Try[T]] = {
-    for(res <- Requests.get(database.url + s"/_local/$id", parameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - ""))
-    yield Try(Json.fromJson[T](Json.parse(res.get)).get)
+  def getLocal[T](id:String, rev:Option[String] = None)
+                 (implicit database:Database, system:ActorSystem, context:ExecutionContext, reads: Reads[T]): Future[T] = {
+    Requests.get(database.url + s"/_local/$id", queryParameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - "").map{
+      response =>
+        Requests.processObjectResponse[T](response)
+    }
   }
 
   /**
@@ -53,9 +61,12 @@ object Document {
    * @param database
    * @return
    */
-  def updateOrCreate[T](doc:T, id:String)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
-    for(res <- Requests.put(database.url + s"/$id", body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
-    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
+  def updateOrCreate[T](doc:T, id:String)
+                       (implicit database:Database, system:ActorSystem, context:ExecutionContext, writes: Writes[T]): Future[DocumentResult] = {
+    Requests.put(database.url + s"/$id", body = Json.stringify(Json.toJson[T](doc))).map{
+      response =>
+        Requests.processObjectResponse[DocumentResult](response)
+    }
   }
 
   /**
@@ -65,9 +76,11 @@ object Document {
    * @param database
    * @return
    */
-  def updateOrCreateLocal[T](doc:T, id:String)(implicit database:Database, writes: Writes[T]): Future[Try[DocumentResult]] = {
-    for(res <- Requests.put(database.url  + s"/_local/$id", body = Json.stringify(Json.toJson[T](doc)), headers = Map("Content-Type" -> "application/json")))
-    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
+  def updateOrCreateLocal[T](doc:T, id:String)(implicit database:Database, system:ActorSystem, context:ExecutionContext, writes: Writes[T]): Future[DocumentResult] = {
+    Requests.put(database.url + s"/_local/$id", body = Json.stringify(Json.toJson[T](doc))).map{
+      response =>
+        Requests.processObjectResponse[DocumentResult](response)
+    }
   }
 
 
@@ -78,9 +91,11 @@ object Document {
    * @param database
    * @return
    */
-  def delete(id:String, rev:String)(implicit database:Database): Future[Try[DocumentResult]] = {
-    for(res <- Requests.delete(database.url + s"/$id", parameters = Map("rev"-> rev)))
-    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
+  def delete(id:String, rev:String)(implicit database:Database, system:ActorSystem, context:ExecutionContext): Future[DocumentResult] = {
+    Requests.delete(database.url + s"/$id", queryParameters = Map("rev"-> rev)).map{
+      response =>
+        Requests.processObjectResponse[DocumentResult](response)
+    }
   }
 
 
@@ -91,9 +106,11 @@ object Document {
    * @param database
    * @return
    */
-  def deleteLocal(id:String, rev:String)(implicit database:Database): Future[Try[DocumentResult]] = {
-    for(res <- Requests.delete(database.url + s"/_local/$id", parameters = Map("rev"-> rev)))
-    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
+  def deleteLocal(id:String, rev:String)(implicit database:Database, system:ActorSystem, context:ExecutionContext): Future[DocumentResult] = {
+    Requests.delete(database.url + s"/_local/$id", queryParameters = Map("rev"-> rev)).map{
+      response =>
+        Requests.processObjectResponse[DocumentResult](response)
+    }
   }
 
   /**
@@ -103,8 +120,11 @@ object Document {
    * @param database
    * @return
    */
-  def getAttachment(id:String, attachmentName:String)(implicit database:Database): Future[Try[Array[Byte]]] = {
-    Requests.getBytes(database.url + s"/$id/$attachmentName")
+  def getAttachment(id:String, attachmentName:String)(implicit database:Database, system:ActorSystem, context:ExecutionContext): Future[Array[Byte]] = {
+    Requests.get(database.url + s"/$id/$attachmentName").map{
+      response =>
+        Requests.processBinaryResponse(response)
+    }
   }
 
   /**
@@ -117,11 +137,14 @@ object Document {
    * @param database
    * @return
    */
-  def addAttachment(id:String, rev:String, attachmentName:String, attachment:java.io.File, mimeType:String)(implicit database:Database): Future[Try[DocumentResult]] = {
-    for(res <- Requests.putFile(database.url + s"/$id/$attachmentName", file=attachment,
-      parameters = Map("rev"-> rev),
-      headers = Map() + ("Content-Length" -> attachment.length().toString) + ("Mime-Type" -> mimeType)))
-    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
+  def addAttachment(id:String, rev:String, attachmentName:String, attachment:java.io.File, mimeType:String)
+                   (implicit database:Database, system:ActorSystem, context:ExecutionContext): Future[DocumentResult] = {
+    Requests.putFile(database.url + s"/$id/$attachmentName", file=attachment,
+      queryParameters = Map("rev"-> rev),
+      headers = Map() + ("Mime-Type" -> mimeType)).map{
+      response =>
+        Requests.processObjectResponse[DocumentResult](response)
+    }
   }
 
 
@@ -133,8 +156,12 @@ object Document {
    * @param database
    * @return
    */
-  def deleteAttachment(id:String, rev:String, attachmentName:String)(implicit database:Database): Future[Try[DocumentResult]] = {
-    for(res <- Requests.delete(database.url + s"/$id/$attachmentName", parameters = Map("rev"-> rev)))
-    yield Try(Json.fromJson[DocumentResult](Json.parse(res.get)).get)
+  def deleteAttachment(id:String, rev:String, attachmentName:String)
+                      (implicit database:Database, system:ActorSystem, context:ExecutionContext): Future[DocumentResult] = {
+
+    Requests.delete(database.url + s"/$id/$attachmentName", queryParameters = Map("rev"-> rev)).map{
+      response =>
+        Requests.processObjectResponse[DocumentResult](response)
+    }
   }
 }
