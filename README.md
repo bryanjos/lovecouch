@@ -5,9 +5,9 @@
 
 The goal is to implement all relevant API from the [CouchDB API Reference]
 
-Currently uses the Play2 Json Library and Dispatch
+Currently uses the Play2 Json Library for Json parsing. Currently using Dispatch for the http client, but switching over to Spray
 
-All methods return a Future[Try[U]] where U is whatever object is wanted
+All methods will return a Future[U] where U is whatever object is wanted whenever everything is done.
 
 
 ### Examples
