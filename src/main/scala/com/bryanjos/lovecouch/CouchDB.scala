@@ -4,8 +4,8 @@ import scala.concurrent._
 import ExecutionContext.Implicits.global
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
-import dispatch.stream.StringsByLine
-import scala.util.Try
+import akka.actor.ActorSystem
+import spray.http.HttpEntity
 
 case class CouchDb(host: String = "127.0.0.1", port: Int = 5984) {
   def url: String = s"http://$host:$port"
@@ -53,6 +53,9 @@ case class HttpdStats(clientsRequestingChanges:StatItem, temporaryViewReads:Stat
 
 case class Stats(couchdb:CouchDBStats, httpdRequestMethods:HttpRequestMethodStats,
                  httpdStatusCodes:HttpStatusCodeStats, httpd:HttpdStats)
+
+
+class CouchDBException(msg: String) extends RuntimeException(msg)
 
 object FeedTypes extends Enumeration {
   type FeedTypes = Value
@@ -169,9 +172,11 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def info()(implicit couchDb: CouchDb = CouchDb()): Future[Try[CouchDbInfo]] = {
-    for(res <- Requests.get(couchDb.url))
-    yield Try(Json.fromJson[CouchDbInfo](Json.parse(res.get)).get)
+  def info()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[CouchDbInfo] = {
+    SprayRequests.get(couchDb.url).map{
+      response =>
+        SprayRequests.processJsonResponse[CouchDbInfo](response)
+    }
   }
 
   /**
@@ -179,9 +184,11 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[ActiveTask]]] = {
-    for(res <- Requests.get(couchDb.url + "/_active_tasks"))
-    yield Try(Json.fromJson[Vector[ActiveTask]](Json.parse(res.get)).get)
+  def activeTasks()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[ActiveTask]] = {
+    SprayRequests.get(couchDb.url + "/_active_tasks").map{
+      response =>
+        SprayRequests.processJsonResponse[Vector[ActiveTask]](response)
+    }
   }
 
   /**
@@ -189,27 +196,11 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[String]]] = {
-    for(res <- Requests.get(couchDb.url + "/_all_dbs"))
-    yield Try(Json.fromJson[Vector[String]](Json.parse(res.get)).get)
-  }
-
-  /**
-   * Returns a list of all database events in the CouchDB instance.
-   * @param feed
-   * @param timeout
-   * @param heartbeat
-   * @param couchDb
-   * @return
-   */
-  def updates(callBack: DatabaseEvent => Unit,
-              feed: FeedTypes.FeedTypes = FeedTypes.LongPoll,
-              timeout: Long = 60,
-              heartbeat: Boolean = true)
-              (implicit couchDb: CouchDb = CouchDb()): Object with StringsByLine[Unit] = {
-    Requests.getStream(couchDb.url + s"/_db_updates?feed=${feed.toString}&timeout=$timeout&heartbeat=$heartbeat",
-    line => callBack(Json.fromJson[DatabaseEvent](Json.parse(line)).get)
-    )
+  def allDbs()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[String]] = {
+    SprayRequests.get(couchDb.url + "/_all_dbs").map{
+      response =>
+        SprayRequests.processJsonResponse[Vector[String]](response)
+    }
   }
 
   /**
@@ -219,9 +210,11 @@ object CouchDb {
    * @param offset
    * @return
    */
-  def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]] = {
-    for(res <- Requests.get(couchDb.url + s"/_log?bytes=$bytes&offset=$offset"))
-    yield Try(res.get)
+  def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[String] = {
+    SprayRequests.get(couchDb.url + s"/_log?bytes=$bytes&offset=$offset").map{
+      response =>
+        SprayRequests.processStringResponse(response)
+    }
   }
 
   /**
@@ -234,10 +227,14 @@ object CouchDb {
    * @return
    */
   def replicate(replicationSpecification: ReplicationSpecification, bytes: Long = 1000, offset: Long = 0)
-               (implicit couchDb: CouchDb = CouchDb()): Future[Try[ReplicationResponse]] = {
-    for(res <- Requests.post(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset",
-      body = Json.stringify(Json.toJson(replicationSpecification))))
-    yield Try(Json.fromJson[ReplicationResponse](Json.parse(res.get)).get)
+               (implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[ReplicationResponse] = {
+
+
+    SprayRequests.post(couchDb.url + s"/_replicate?bytes=$bytes&offset=$offset",
+      body = Json.stringify(Json.toJson(replicationSpecification))).map{
+      response =>
+        SprayRequests.processJsonResponse[ReplicationResponse](response)
+    }
   }
 
   /**
@@ -245,9 +242,11 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def restart()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Boolean]] = {
-    for(res <- Requests.post(couchDb.url + s"/_restart", headers = Map("Content-Type" -> "application/json")))
-    yield Try((Json.parse(res.get) \ "ok").as[Boolean])
+  def restart()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Boolean] = {
+    SprayRequests.post(couchDb.url + s"/_restart", headers = Map("Content-Type" -> "application/json")).map{
+      response =>
+        SprayRequests.processBooleanResponse(response)
+    }
   }
 
   /**
@@ -255,9 +254,11 @@ object CouchDb {
    * @param couchDb
    * @return
    */
-  def stats()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Stats]] = {
-    for(res <- Requests.get(couchDb.url + s"/_stats"))
-    yield Try(Json.fromJson[Stats](Json.parse(res.get)).get)
+  def stats()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Stats] = {
+    SprayRequests.get(couchDb.url + "/_stats").map{
+      response =>
+        SprayRequests.processJsonResponse[Stats](response)
+    }
   }
 
   /**
@@ -266,8 +267,11 @@ object CouchDb {
    * @param count
    * @return
    */
-  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[String]]] = {
-    for(res <- Requests.get(couchDb.url + s"/_uuids?count=$count"))
-    yield Try((Json.parse(res.get) \ "uuids").as[Vector[String]])
+  def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[String]] = {
+    SprayRequests.get(couchDb.url + s"/_uuids?count=$count").map{
+      response =>
+        SprayRequests.processResponse[Vector[String]](response,
+          (e:HttpEntity) => (Json.parse(e.asString) \ "uuids").as[Vector[String]])
+    }
   }
 }
