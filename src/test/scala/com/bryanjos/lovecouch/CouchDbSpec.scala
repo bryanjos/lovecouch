@@ -5,8 +5,6 @@ import scala.concurrent.duration._
 import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 import akka.actor.ActorSystem
-import akka.io.IO
-import akka.pattern.ask
 
 class CouchDbSpec extends FunSpec {
   implicit val system = ActorSystem()

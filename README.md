@@ -10,6 +10,15 @@ Currently uses the Play2 Json Library for Json parsing. Currently using Dispatch
 All methods will return a Future[U] where U is whatever object is wanted whenever everything is done.
 
 
+When the spray integration is completed, you will have to make an implicit ActorSystem to use it
+
+
+```scala
+import akka.actor.ActorSystem
+implicit val system = ActorSystem()
+```
+
+
 ### Examples
 
 #### Everything is in the com.bryanjos.lovecouch package
@@ -21,59 +30,53 @@ import com.bryanjos.lovecouch._
 ### CouchDB functions
 
 
-#### def info()(implicit couchDb: CouchDb = CouchDb()): Future[Try[CouchDbInfo]]
+#### def info()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[CouchDbInfo]
 ##### Get the welcome message and version information
 ```scala
 val info = CouchDB.info()
 ```
 
-#### def activeTasks()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[ActiveTask]]]
+#### def activeTasks()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[ActiveTask]]
 ##### Currently running tasks
 ```scala
 val activeTasks = CouchDB.activeTasks()
 ```
 
 
-#### def allDbs()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[String]]]
+#### def allDbs()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[String]]
 ##### Returns a list of all the databases in the CouchDB instance
 ```scala
 val dbs = CouchDB.allDbs()
 ```
 
-#### def updates(callBack: DatabaseEvent => Unit, feed: FeedTypes.FeedTypes = FeedTypes.LongPoll, timeout: Long = 60, heartbeat: Boolean = true)(implicit couchDb: CouchDb = CouchDb()): Object with StringsByLine[Unit]
-##### Returns a list of all database events in the CouchDB instance.
-```scala
-//Still a WIP
-```
-
-#### def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb()): Future[Try[String]]
+#### def log(bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[String]
 ##### Gets the CouchDB log, equivalent to accessing the local log file of the corresponding CouchDB instance.
 ```scala
 val log = CouchDB.log(bytes = 1000, offset = 50)
 ```
 
-#### def replicate(replicationSpecification: ReplicationSpecification, bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb()): Future[Try[ReplicationResponse]]
+#### def replicate(replicationSpecification: ReplicationSpecification, bytes: Long = 1000, offset: Long = 0)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[ReplicationResponse]
 ##### Request, configure, or stop, a replication operation.
 ```scala
 val response = CouchDB.replicate(ReplicationSpecification(false, source="", target ="")
 ```
 
 
-#### def restart()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Boolean]]
+#### def restart()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Boolean]
 ##### Restarts CouchDB
 ```scala
 val response = CouchDB.restart()
 ```
 
 
-#### def stats()(implicit couchDb: CouchDb = CouchDb()): Future[Try[Stats]]
+#### def stats()(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Stats]
 ##### Returns statistics for the running server
 ```scala
 val stats = CouchDB.stats()
 ```
 
 
-#### def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb()): Future[Try[Vector[String]]]
+#### def uuids(count: Int = 1)(implicit couchDb: CouchDb = CouchDb(), system:ActorSystem): Future[Vector[String]]
 ##### Requests one or more Universally Unique Identifiers (UUIDs) from the CouchDB instance
 ```scala
 val uuids = CouchDB.uuids()
