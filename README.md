@@ -26,9 +26,8 @@ implicit val context = system.dispatcher
 
 implicit val couchDB = CouchDB() //Uses default host and port
 CouchDb.info()
-//or
 
-implicit val database = Database("test")
+implicit val database = Database("test", couchDB = couchDB) // or use default CouchDB instance:  Database("test")
 Database.info()
 ```
 
