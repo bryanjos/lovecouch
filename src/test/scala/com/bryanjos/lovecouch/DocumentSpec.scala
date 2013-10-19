@@ -2,13 +2,13 @@ package com.bryanjos.lovecouch
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Await}
-import ExecutionContext.Implicits.global
 import org.scalatest._
 import play.api.libs.json.Json
 import akka.actor.ActorSystem
 
 class DocumentSpec extends FunSpec with BeforeAndAfterAll {
   implicit val system = ActorSystem()
+  implicit val context = system.dispatcher
   implicit val db = Database(name = "documentspec")
 
   case class Guy(_id: Option[String] = None, _rev: Option[String] = None, name: String, age: Long)

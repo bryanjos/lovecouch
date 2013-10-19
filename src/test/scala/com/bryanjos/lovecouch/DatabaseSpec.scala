@@ -2,13 +2,13 @@ package com.bryanjos.lovecouch
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 import play.api.libs.json.{JsArray, Json}
 import akka.actor.ActorSystem
 
 class DatabaseSpec extends FunSpec {
   implicit val system = ActorSystem()
+  implicit val context = system.dispatcher
   implicit val db = Database("test")
   case class Guy(_id:Option[String] = None, _rev:Option[String] = None, name:String, age:Long)
   implicit val guyFmt = Json.format[Guy]

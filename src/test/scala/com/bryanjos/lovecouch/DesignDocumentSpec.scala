@@ -4,12 +4,12 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterAll, FunSpec}
 import scala.concurrent.Await
-import ExecutionContext.Implicits.global
 import play.api.libs.json.Json
 import akka.actor.ActorSystem
 
 class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
   implicit val system = ActorSystem()
+  implicit val context = system.dispatcher
   implicit val db = Database(name = "designdocumentspec")
   var id = ""
   var revs = List[String]()

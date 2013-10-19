@@ -2,12 +2,12 @@ package com.bryanjos.lovecouch
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import ExecutionContext.Implicits.global
 import org.scalatest.FunSpec
 import akka.actor.ActorSystem
 
 class CouchDbSpec extends FunSpec {
   implicit val system = ActorSystem()
+  implicit val context = system.dispatcher
 
   info("CouchDB Miscellaneous Methods")
 

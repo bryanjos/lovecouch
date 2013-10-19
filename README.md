@@ -12,18 +12,28 @@ All methods will return a Future[U] where U is whatever object is wanted wheneve
 If an error occurs, than a CouchDBException will be thrown
 
 
-#### All methods need an implicit ActorSystem and ExecutionContext
-
-
-```scala
-import akka.actor.ActorSystem
-implicit val system = ActorSystem()
-```
+#### All methods need an implicit ActorSystem and ExecutionContext along with either an implicit instance of either the CouchDB or Database class.
 
 #### Everything is in the com.bryanjos.lovecouch package
 ```scala
 import com.bryanjos.lovecouch._
+import akka.actor.ActorSystem
+
+implicit val system = ActorSystem()
+implicit val context = system.dispatcher
+
+
+
+implicit val couchDB = CouchDB() //Uses default host and port
+CouchDb.info()
+//or
+
+implicit val database = Database("test")
+Database.info()
 ```
+
+
+There are 5 Objects to interact with: Config, CouchDB, Database, DesignDocument, Document. These correspond to [CouchDB API Reference] sections.
 
 
 
