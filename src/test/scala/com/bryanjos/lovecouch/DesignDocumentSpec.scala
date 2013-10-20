@@ -1,6 +1,5 @@
 package com.bryanjos.lovecouch
 
-import scala.concurrent._
 import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterAll, FunSpec}
 import scala.concurrent.Await

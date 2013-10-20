@@ -1,7 +1,7 @@
 package com.bryanjos.lovecouch
 
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Await}
+import scala.concurrent.Await
 import org.scalatest._
 import play.api.libs.json.Json
 import akka.actor.ActorSystem
