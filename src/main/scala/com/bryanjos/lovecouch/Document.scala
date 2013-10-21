@@ -31,24 +31,10 @@ object Document {
    * @param database
    * @return
    */
-  def get[T](id:String, rev:Option[String] = None)
+  def get[T](id:String, rev:Option[String] = None, local:Boolean=false)
             (implicit database:Database, system:ActorSystem, context:ExecutionContext, reads: Reads[T]): Future[T] = {
-    Requests.get(database.url + s"/$id", queryParameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - "").map{
-      response =>
-        Requests.processObjectResponse[T](response)
-    }
-  }
-
-  /**
-   * Gets the specified local document.
-   * @param id
-   * @param rev
-   * @param database
-   * @return
-   */
-  def getLocal[T](id:String, rev:Option[String] = None)
-                 (implicit database:Database, system:ActorSystem, context:ExecutionContext, reads: Reads[T]): Future[T] = {
-    Requests.get(database.url + s"/_local/$id", queryParameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - "").map{
+    val url = database.url.concat(if(local){ s"/_local/$id" } else { s"/$id" })
+    Requests.get(url, queryParameters = Map(rev.map{r => "rev"-> r}.orElse(Some(""->"")).get) - "").map{
       response =>
         Requests.processObjectResponse[T](response)
     }
@@ -61,23 +47,11 @@ object Document {
    * @param database
    * @return
    */
-  def updateOrCreate[T](doc:T, id:String)
+  def update[T](doc:T, id:String, local:Boolean=false)
                        (implicit database:Database, system:ActorSystem, context:ExecutionContext, writes: Writes[T]): Future[DocumentResult] = {
-    Requests.put(database.url + s"/$id", body = Json.stringify(Json.toJson[T](doc))).map{
-      response =>
-        Requests.processObjectResponse[DocumentResult](response)
-    }
-  }
 
-  /**
-   * Stores the specified local document.
-   * @param doc
-   * @param id
-   * @param database
-   * @return
-   */
-  def updateOrCreateLocal[T](doc:T, id:String)(implicit database:Database, system:ActorSystem, context:ExecutionContext, writes: Writes[T]): Future[DocumentResult] = {
-    Requests.put(database.url + s"/_local/$id", body = Json.stringify(Json.toJson[T](doc))).map{
+    val url = database.url.concat(if(local){ s"/_local/$id" } else { s"/$id" })
+    Requests.put(url, body = Json.stringify(Json.toJson[T](doc))).map{
       response =>
         Requests.processObjectResponse[DocumentResult](response)
     }
@@ -91,23 +65,10 @@ object Document {
    * @param database
    * @return
    */
-  def delete(id:String, rev:String)(implicit database:Database, system:ActorSystem, context:ExecutionContext): Future[DocumentResult] = {
-    Requests.delete(database.url + s"/$id", queryParameters = Map("rev"-> rev)).map{
-      response =>
-        Requests.processObjectResponse[DocumentResult](response)
-    }
-  }
-
-
-  /**
-   * Deletes the specified local document.
-   * @param id
-   * @param rev
-   * @param database
-   * @return
-   */
-  def deleteLocal(id:String, rev:String)(implicit database:Database, system:ActorSystem, context:ExecutionContext): Future[DocumentResult] = {
-    Requests.delete(database.url + s"/_local/$id", queryParameters = Map("rev"-> rev)).map{
+  def delete(id:String, rev:String, local:Boolean=false)
+            (implicit database:Database, system:ActorSystem, context:ExecutionContext): Future[DocumentResult] = {
+    val url = database.url.concat(if(local){ s"/_local/$id" } else { s"/$id" })
+    Requests.delete(url, queryParameters = Map("rev"-> rev)).map{
       response =>
         Requests.processObjectResponse[DocumentResult](response)
     }

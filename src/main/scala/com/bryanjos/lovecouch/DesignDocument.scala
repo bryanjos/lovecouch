@@ -205,7 +205,7 @@ object DesignDocument {
    * @param database
    * @return
    */
-  def executeView(designDocName: String, viewName: String,
+  def executeView(designDocName: String, viewName: String, keys: Vector[String] = Vector[String](),
                      descending: Option[Boolean] = None,
                      endKey: Option[String] = None,
                      endKeyDocId: Option[String] = None,
@@ -270,145 +270,37 @@ object DesignDocument {
         v => "update_seq" -> v.toString
       }.orElse(Some("" -> "")).get - ""
 
-    Requests.get(database.url + s"/$designDocName/_view/$viewName", queryParameters = map).map{
-      response =>
-        Requests.processResponse[ViewResult](response,
-          (e:HttpEntity) => {
-            val json = Json.parse(e.asString)
 
-            ViewResult(
-              (json \ "total_rows").as[Long],
-              (json \ "rows").as[List[JsObject]].map {
-                row =>
-                  ViewRow(
-                    (row \ "id").as[String],
-                    (row \ "key").asOpt[String],
-                    (row \ "value").as[JsValue]
-                  )
-              }.toVector,
-              (json \ "offset").as[Long]
+    val renderViewResult = (e:HttpEntity) => {
+      val json = Json.parse(e.asString)
+
+      ViewResult(
+        (json \ "total_rows").as[Long],
+        (json \ "rows").as[List[JsObject]].map {
+          row =>
+            ViewRow(
+              (row \ "id").as[String],
+              (row \ "key").asOpt[String],
+              (row \ "value").as[JsValue]
             )
-          })
+        }.toVector,
+        (json \ "offset").as[Long]
+      )
+    }
+
+    if(keys.isEmpty){
+      Requests.get(database.url + s"/$designDocName/_view/$viewName", queryParameters = map).map{
+        response =>
+          Requests.processResponse[ViewResult](response,renderViewResult)
+      }
+    }else{
+      Requests.post(database.url + s"/$designDocName/_view/$viewName",
+        body = Json.stringify(Json.obj("keys" -> keys)),
+        queryParameters = map
+      ).map{
+        response =>
+          Requests.processResponse[ViewResult](response,renderViewResult)
+      }
     }
   }
-
-  /**
-   * Executes the specified view-name from the specified design-doc design document.
-   * Unlike the GET method for accessing views, the POST method supports the specification
-   * of explicit keys to be retrieved from the view results.
-   * @param designDocName
-   * @param viewName
-   * @param keys
-   * @param descending
-   * @param endKey
-   * @param endKeyDocId
-   * @param group
-   * @param groupLevel
-   * @param includeDocs
-   * @param inclusiveEnd
-   * @param key
-   * @param limit
-   * @param reduce
-   * @param skip
-   * @param stale
-   * @param startKey
-   * @param startKeyDocId
-   * @param updateSeq
-   * @param database
-   * @return
-   */
-  def executeViewPost(designDocName: String,
-                         viewName: String,
-                         keys: Vector[String],
-                         descending: Option[Boolean] = None,
-                         endKey: Option[String] = None,
-                         endKeyDocId: Option[String] = None,
-                         group: Option[Boolean] = None,
-                         groupLevel: Option[Long] = None,
-                         includeDocs: Option[Boolean] = None,
-                         inclusiveEnd: Option[Boolean] = None,
-                         key: Option[String] = None,
-                         limit: Option[Long] = None,
-                         reduce: Option[Boolean] = None,
-                         skip: Option[Long] = None,
-                         stale: Option[String] = None,
-                         startKey: Option[String] = None,
-                         startKeyDocId: Option[String] = None,
-                         updateSeq: Option[Boolean] = None)
-                        (implicit database: Database, system:ActorSystem, context:ExecutionContext): Future[ViewResult] = {
-
-
-    val map = Map[String, String]() +
-      descending.map {
-        v => "descending" -> v.toString
-      }.orElse(Some("" -> "")).get +
-      endKey.map {
-        v => "endkey" -> v
-      }.orElse(Some("" -> "")).get +
-      endKeyDocId.map {
-        v => "endkey_docid" -> v
-      }.orElse(Some("" -> "")).get +
-      group.map {
-        v => "group" -> v.toString
-      }.orElse(Some("" -> "")).get +
-      groupLevel.map {
-        v => "group_level" -> v.toString
-      }.orElse(Some("" -> "")).get +
-      includeDocs.map {
-        v => "include_docs" -> v.toString
-      }.orElse(Some("" -> "")).get +
-      inclusiveEnd.map {
-        v => "inclusive_end" -> v.toString
-      }.orElse(Some("" -> "")).get +
-      key.map {
-        v => "key" -> v
-      }.orElse(Some("" -> "")).get +
-      limit.map {
-        v => "limit" -> v.toString
-      }.orElse(Some("" -> "")).get +
-      reduce.map {
-        v => "reduce" -> v.toString
-      }.orElse(Some("" -> "")).get +
-      skip.map {
-        v => "skip" -> v.toString
-      }.orElse(Some("" -> "")).get +
-      stale.map {
-        v => "stale" -> v
-      }.orElse(Some("" -> "")).get +
-      startKey.map {
-        v => "startkey" -> v
-      }.orElse(Some("" -> "")).get +
-      startKeyDocId.map {
-        v => "startkey_docid" -> v
-      }.orElse(Some("" -> "")).get +
-      updateSeq.map {
-        v => "update_seq" -> v.toString
-      }.orElse(Some("" -> "")).get - ""
-
-
-    Requests.post(database.url + s"/$designDocName/_view/$viewName",
-      body = Json.stringify(Json.obj("keys" -> keys)),
-      queryParameters = map
-    ).map{
-      response =>
-        Requests.processResponse[ViewResult](response,
-          (e:HttpEntity) => {
-            val json = Json.parse(e.asString)
-
-            ViewResult(
-              (json \ "total_rows").as[Long],
-              (json \ "rows").as[List[JsObject]].map {
-                row =>
-                  ViewRow(
-                    (row \ "id").as[String],
-                    (row \ "key").asOpt[String],
-                    (row \ "value").as[JsValue]
-                  )
-              }.toVector,
-              (json \ "offset").as[Long]
-            )
-          })
-    }
-  }
-
 }

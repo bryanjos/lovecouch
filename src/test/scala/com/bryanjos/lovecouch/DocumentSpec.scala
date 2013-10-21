@@ -56,7 +56,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be updated") {
       val data = Guy(_id = Some(id), _rev = Some(revs.last), name = "Alf", age = 24)
 
-      val result = Document.updateOrCreate[Guy](data, id) map {
+      val result = Document.update[Guy](data, id) map {
         value =>
           revs = revs ++ List[String](value.rev)
           assert(value.ok)
