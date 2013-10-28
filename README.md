@@ -22,13 +22,18 @@ import akka.actor.ActorSystem
 implicit val system = ActorSystem()
 implicit val context = system.dispatcher
 
-
-
 implicit val couchDB = CouchDB() //Uses default host and port
-CouchDb.info()
-
 implicit val database = Database("test", couchDB = couchDB) // or use default CouchDB instance:  Database("test")
-Database.info()
+
+case class Guy(_id: Option[String] = None, _rev: Option[String] = None, name: String, age: Long) //Make sure _id and _rev are defined
+implicit val guyFmt = Json.format[Guy] //Json formatter
+
+val guy = Guy(name = "Alf", age = 23)
+Document.create[Guy](guy) map {
+result =>
+    //A DocumentResult is returned
+}
+
 ```
 
 
