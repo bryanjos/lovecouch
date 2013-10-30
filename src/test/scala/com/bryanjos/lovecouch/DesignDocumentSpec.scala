@@ -9,7 +9,8 @@ import akka.actor.ActorSystem
 class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
   implicit val system = ActorSystem()
   implicit val context = system.dispatcher
-  implicit val db = Database(name = "designdocumentspec")
+  val couchDB = CouchDb()
+  val db = Database(name = "designdocumentspec", couchDB.url)
   var id = ""
   var revs = List[String]()
 
@@ -17,17 +18,18 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   implicit val guyFmt = Json.format[Guy]
 
-  val dd = DesignDocument(_id = "_design/ages", views = List[View](View(name = "by_age", map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }")))
+  val dd = DesignDocument(_id = Some("_design/ages"),
+    views = List[View](View(name = "by_age", map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }")))
 
   info("CouchDB Design Document Methods")
 
   override def beforeAll() {
-    Await.result(Database.create(), 5 seconds)
+    Await.result(couchDB.createDatabase("designdocumentspec"), 5 seconds)
   }
 
   describe("Upload the specified design document") {
     it("should be ok") {
-      val result = DesignDocument.addOrUpdate(dd) map {
+      val result = db.addOrUpdateDesignDocument(dd) map {
         value =>
 
           id = value.id
@@ -41,10 +43,10 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Returns the specified design document") {
     it("should return the design document") {
-      val result = DesignDocument.get(id) map {
+      val result = db.getDesignDocument(id) map {
         value =>
 
-          assert(value._id == id)
+          assert(value._id.get == id)
           assert(value._rev.get == revs.head)
           assert(value.views.head.name == "by_age")
       }
@@ -57,8 +59,8 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Executes the specified view-name from the specified design-doc design document.") {
     it("should return one result") {
-      Await.result(Database.bulkDocs(Seq[Guy](Guy(name = "Alf", age = 23), Guy(name = "SuperAlf", age = 46))), 5 seconds)
-      val result = DesignDocument.executeView("_design/ages", "by_age") map {
+      Await.result(db.bulkDocs(Seq[Guy](Guy(name = "Alf", age = 23), Guy(name = "SuperAlf", age = 46))), 5 seconds)
+      val result = db.executeView(dd._id.get, "by_age") map {
         value =>
 
           assert(value.rows.size == 1)
@@ -70,7 +72,7 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Delete an existing design document") {
     it("should be deleted successfully") {
-      val result = DesignDocument.delete(id, revs.head) map {
+      val result = db.deleteDesignDocument(id, revs.head) map {
         value =>
 
           assert(value.ok)
@@ -80,6 +82,6 @@ class DesignDocumentSpec extends FunSpec with BeforeAndAfterAll {
   }
 
   override def afterAll() {
-    Await.result(Database.delete(), 5 seconds)
+    Await.result(couchDB.deleteDatabase("designdocumentspec"), 5 seconds)
   }
 }

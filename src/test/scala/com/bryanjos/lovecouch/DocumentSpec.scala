@@ -9,9 +9,12 @@ import akka.actor.ActorSystem
 class DocumentSpec extends FunSpec with BeforeAndAfterAll {
   implicit val system = ActorSystem()
   implicit val context = system.dispatcher
-  implicit val db = Database(name = "documentspec")
+  val couchDB = CouchDb()
+  val db = Database(name = "documentspec", couchDB.url)
 
-  case class Guy(_id: Option[String] = None, _rev: Option[String] = None, name: String, age: Long)
+  case class Guy(_id: Option[String] = None,
+                 _rev: Option[String] = None,
+                 name: String, age: Long)
 
   implicit val guyFmt = Json.format[Guy]
   var id = ""
@@ -20,13 +23,13 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
   info("CouchDB Document Methods")
 
   override def beforeAll() {
-    Await.result(Database.create(), 5 seconds)
+    Await.result(couchDB.createDatabase("documentspec"), 5 seconds)
   }
 
   describe("Create a new document") {
     it("should be created") {
       val data = Guy(name = "Alf", age = 23)
-      val result = Document.create[Guy](data) map {
+      val result = db.createDocument[Guy](data) map {
         value =>
           id = value.id
           revs = revs ++ List[String](value.rev)
@@ -39,7 +42,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Returns the latest revision of the document") {
     it("should be return the wanted document") {
-      val result = Document.get[Guy](id) map {
+      val result = db.getDocument[Guy](id) map {
         value =>
           assert(value.age == 23)
           assert(value.name == "Alf")
@@ -56,7 +59,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
     it("should be updated") {
       val data = Guy(_id = Some(id), _rev = Some(revs.last), name = "Alf", age = 24)
 
-      val result = Document.update[Guy](data, id) map {
+      val result = db.updateDocument[Guy](data, id) map {
         value =>
           revs = revs ++ List[String](value.rev)
           assert(value.ok)
@@ -70,7 +73,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Adds an attachment of a document") {
     it("should be added") {
-      val result = Document.addAttachment(id,
+      val result = db.addAttachment(id,
         revs.last,
         "README.md",
         new java.io.File("/Users/bryanjos/Projects/Personal/lovecouch/README.md"),
@@ -86,7 +89,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Gets the attachment of a document") {
     it("should be a byte array with non zero bytes") {
-      val result = Document.getAttachment(id, "README.md") map {
+      val result = db.getAttachment(id, "README.md") map {
         value =>
           assert(!value.isEmpty)
       }
@@ -100,7 +103,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Returns the a revision of the document") {
     it("should be a previous revision of the document") {
-      val result = Document.get[Guy](id, Some(revs.head)) map {
+      val result = db.getDocument[Guy](id, Some(revs.head)) map {
         value =>
           assert(value.age == 23)
           assert(value.name == "Alf")
@@ -116,7 +119,7 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
 
   describe("Deletes the document") {
     it("should be deleted") {
-      val result = Document.delete(id, revs.last) map {
+      val result = db.deleteDocument(id, revs.last) map {
         value =>
           assert(value.ok)
       }
@@ -128,6 +131,6 @@ class DocumentSpec extends FunSpec with BeforeAndAfterAll {
   }
 
   override def afterAll() {
-    Await.result(Database.delete(), 5 seconds)
+    Await.result(couchDB.deleteDatabase("documentspec"), 5 seconds)
   }
 }

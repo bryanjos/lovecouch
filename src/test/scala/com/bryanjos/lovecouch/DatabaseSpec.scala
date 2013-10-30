@@ -9,16 +9,17 @@ import akka.actor.ActorSystem
 class DatabaseSpec extends FunSpec {
   implicit val system = ActorSystem()
   implicit val context = system.dispatcher
-  implicit val db = Database("test")
+  val couchDB = CouchDb()
+  val db = Database("test", couchDB.url)
   case class Guy(_id:Option[String] = None, _rev:Option[String] = None, name:String, age:Long)
   implicit val guyFmt = Json.format[Guy]
 
   info("CouchDB Database Methods")
 
   describe("Create a new database") {
-    val result = Database.create() map { value =>
+    val result = couchDB.createDatabase("test") map { value =>
       it("should be created"){
-        assert(value)
+        assert(true)
       }
     }
 
@@ -26,7 +27,7 @@ class DatabaseSpec extends FunSpec {
   }
 
   describe("Returns database information") {
-    val result = Database.info() map { value =>
+    val result = db.info() map { value =>
       it("should be named test"){
         assert(value.dbName == "test")
       }
@@ -36,7 +37,7 @@ class DatabaseSpec extends FunSpec {
   }
 
   describe("Insert multiple documents in to the database in a single request") {
-    val result = Database.bulkDocs(Seq[Guy](Guy(name="Alf", age=23), Guy(name="SuperAlf", age=46))) map { value =>
+    val result = db.bulkDocs(Seq[Guy](Guy(name="Alf", age=23), Guy(name="SuperAlf", age=46))) map { value =>
       it("should be a Json Array"){
         assert(value.isInstanceOf[JsArray])
       }
@@ -50,7 +51,7 @@ class DatabaseSpec extends FunSpec {
   }
 
   describe("Execute a given view function for all documents and return the result") {
-    val result = Database.tempView(TempView(map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }")) map { value =>
+    val result = db.tempView(TempView(map = "function(doc) { if (doc.age > 30) { emit(null, doc.age); } }")) map { value =>
 
       it("should have one element"){
         assert((value \ "rows").as[JsArray].value.size == 1)
@@ -65,9 +66,9 @@ class DatabaseSpec extends FunSpec {
   }
 
   describe("Delete an existing database") {
-    Await.result(Database.delete(), 5 seconds)
+    Await.result(couchDB.deleteDatabase("test"), 5 seconds)
 
-    val result = CouchDb.allDbs() map { value =>
+    val result = couchDB.allDbs() map { value =>
       it("should not contain a database named test"){
         assert(!value.contains("test"))
       }
