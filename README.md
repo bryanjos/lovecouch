@@ -2,6 +2,7 @@
 
 ## An asynchronous CouchDB Library for Scala
 
+Still very in a very volatile state.
 
 The goal is to implement all relevant API from the [CouchDB API Reference]
 

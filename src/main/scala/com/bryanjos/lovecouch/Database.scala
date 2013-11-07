@@ -4,15 +4,92 @@ import scala.concurrent._
 import play.api.libs.json._
 import spray.http.HttpEntity
 import akka.actor.ActorSystem
+import play.api.libs.functional.syntax._
+
+case class DatabaseInfo(dbName: String, docCount: Long, docDelCount: Long, updateSeq: Long, purgeSeq: Long,
+                        compactRunning: Boolean, diskSize: Long, dataSize: Long, instanceStartTime: String,
+                        diskFormatVersion: Long, committedUpdateSeq: Long)
+
+case class EnsureFullCommitResult(ok: Boolean, instanceStartTime: String)
+
+case class SecurityGroup(roles: Vector[String], names: Vector[String])
+
+case class Security(admins: Option[SecurityGroup], readers: Option[SecurityGroup])
+
+case class RowValue(rev:String)
+case class Row(id:String, key:String, value:RowValue)
+case class AllDocsResult(offset:Long, rows:Vector[Row])
+
+case class TempView(map:String, reduce:Option[String] = None)
+
+
+case class DocumentResult(ok:Boolean, id:String, rev:String)
+
+case class ViewIndex(compactRunning: Boolean, updaterRunning: Boolean, language: String, purgeSeq: Long,
+                     waitingCommit: Boolean, waitingClients: Long, signature: String, updateSeq: Long, diskSize: Long)
+
+case class ViewInfo(name: String, viewIndex: ViewIndex)
+case class ViewRow(id: String, key: Option[String] = None, value: JsValue)
+case class ViewResult(totalRows: Long, rows: Vector[ViewRow], offset: Long)
+case class View(name:String, map:String, reduce:Option[String] = None)
+
+case class DesignDocument(_id:Option[String], _rev:Option[String] = None, language:String = "javascript", views:List[View] = List[View]())
+
 
 case class Database(name: String, couchDbUrl: String)(implicit system:ActorSystem, context:ExecutionContext) {
-  import Implicits._
+  implicit val databaseInfoReads = (
+    (__ \ "db_name").read[String] ~
+      (__ \ "doc_count").read[Long] ~
+      (__ \ "doc_del_count").read[Long] ~
+      (__ \ "update_seq").read[Long] ~
+      (__ \ "purge_seq").read[Long] ~
+      (__ \ "compact_running").read[Boolean] ~
+      (__ \ "disk_size").read[Long] ~
+      (__ \ "data_size").read[Long] ~
+      (__ \ "instance_start_time").read[String] ~
+      (__ \ "disk_format_version").read[Long] ~
+      (__ \ "committed_update_seq").read[Long]
+    )(DatabaseInfo.apply _)
+
+  implicit val ensureFullCommitResultReads = (
+    (__ \ "ok").read[Boolean] ~
+      (__ \ "instance_start_time").read[String]
+    )(EnsureFullCommitResult.apply _)
+
+  implicit val securityGroupFmt = Json.format[SecurityGroup]
+  implicit val securityFmt = Json.format[Security]
+  implicit val rowValueFmt = Json.format[RowValue]
+  implicit val rowFmt = Json.format[Row]
+  implicit val allDocsResultFmt = Json.format[AllDocsResult]
+  implicit val tempViewFmt = Json.format[TempView]
+  implicit val viewFmt = Json.format[View]
+  implicit val documentResultFmt = Json.format[DocumentResult]
+
+
+  implicit val viewIndexReads = (
+    (__ \ "compact_running").read[Boolean] ~
+      (__ \ "updater_running").read[Boolean] ~
+      (__ \ "language").read[String] ~
+      (__ \ "purge_seq").read[Long] ~
+      (__ \ "waiting_commit").read[Boolean] ~
+      (__ \ "waiting_clients").read[Long] ~
+      (__ \ "signature").read[String] ~
+      (__ \ "update_seq").read[Long] ~
+      (__ \ "disk_size").read[Long]
+    )(ViewIndex.apply _)
+
+
+  implicit val viewInfoReads = (
+    (__ \ "name").read[String] ~
+      (__ \ "view_index").read[ViewIndex]
+    )(ViewInfo.apply _)
+
+  implicit val designDocumentFmt = Json.format[DesignDocument]
 
   def url: String = s"$couchDbUrl/$name"
 
   /**
    * Gets information about the specified database.
-
    * @return
    */
   def info(): Future[DatabaseInfo] = {
@@ -25,7 +102,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
   /**
    * Request compaction of the specified database.
    * @param designDocName Optionally compacts the view indexes associated with the specified design document.
-
    * @return
    */
   def compact(designDocName: Option[String] = None): Future[Boolean] = {
@@ -37,7 +113,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
 
   /**
    * Cleans up the cached view output on disk for a given view.
-
    * @return
    */
   def viewCleanUp(): Future[Boolean] = {
@@ -61,7 +136,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
   /**
    * Allows you to create and update multiple documents at the same time within a single request.
    * @param docs
-
    * @return
    */
   def bulkDocs[T](docs:Seq[T])(implicit writes: Writes[T]): Future[JsValue] = {
@@ -76,7 +150,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
   /**
    * Creates (and executes) a temporary view based on the view function supplied in the JSON request.
    * @param view
-
    * @return
    */
   def tempView(view:TempView): Future[JsValue] = {
@@ -148,7 +221,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
   /**
    * The POST to _all_docs allows to specify multiple keys to be selected from the database.
    * @param keys
-
    * @return
    */
   def allDocs(keys:Vector[String]): Future[AllDocsResult] = {
@@ -162,7 +234,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
 
   /**
    * Gets the current security object from the specified database.
-
    * @return
    */
   def security(): Future[Security] = {
@@ -175,7 +246,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
   /**
    * Sets the security object for the given database.
    * @param security
-
    * @return
    */
   def setSecurity(security: Security): Future[Boolean] = {
@@ -189,7 +259,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
 
   /**
    * Gets the current revs_limit (revision limit) setting.
-
    * @return
    */
   def revsLimit(): Future[Int] = {
@@ -203,7 +272,6 @@ case class Database(name: String, couchDbUrl: String)(implicit system:ActorSyste
   /**
    * Sets the maximum number of document revisions that will be tracked by CouchDB, even after compaction has occurred.
    * @param limit
-
    * @return
    */
   def setRevsLimit(limit: Int): Future[Boolean] = {
